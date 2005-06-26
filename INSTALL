@@ -1,0 +1,36 @@
+Installation
+============
+
+./configure
+make
+make install
+
+if this succeeds then add an entry to your crontab:
+using crontab -e adding the following line as the user who is going to use
+the program:
+
+*/30 * * * * fusesmbcache &> /dev/null
+
+than you're ready to run:
+
+fusermount <mountpoint> fusesmb
+
+or:
+
+fusesmb <mountpoint>
+
+If your network needs authentication you can add a file:
+
+~/.smb/credentials
+
+with the following two lines:
+
+username = <username>
+password = <password>
+
+Both the network scanner - fusesmbcache - and fusesmb will then use this
+file for authentication.
+
+You can now browse the network!
+
+Have fun!
