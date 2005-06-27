@@ -1,12 +1,15 @@
 /*
    SMB for FUSE
-   Copyright (C) 2003  VIncent Wagelaar <vincent@ricardis.tudelft.nl>
+   Copyright (C) 2003-2005  VIncent Wagelaar <vincent@ricardis.tudelft.nl>
    This program can be distributed under the terms of the GNU GPL.
    See the file COPYING.
 
    Mount complete "Network Neighbourhood"
 
  */
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
 
 #include <fuse.h>
 #include <stdio.h>

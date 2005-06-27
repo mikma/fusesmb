@@ -3,7 +3,6 @@ bin_SCRIPTS=fusesmbcache
 fusesmb_SOURCES=fusesmb.c 
 
 #  uncomment the following if fusesmb requires the math library
-fusesmb_LDADD=-lsmbclient -lpthread -lfuse
 
 #EXTRA_DIST=fusesmb.lsm.in fusesmb.spec.in fusesmb.texinfo
 EXTRA_DIST=fusesmbcache
