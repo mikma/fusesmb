@@ -9,7 +9,7 @@ AM_CONFIG_HEADER(config.h)
 
 AC_SUBST(VERSION)
 AC_DEFINE(_FILE_OFFSET_BITS,64,[Use 64 bits file offsets])
-AC_DEFINE(FUSE_USE_VERSION,11,[Fuse API Version])
+AC_DEFINE(FUSE_USE_VERSION,23,[Fuse API Version])
 
 CFLAGS="-Wall -W -g -O2"
 
