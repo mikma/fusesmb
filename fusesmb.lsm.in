@@ -1,0 +1,21 @@
+Begin3
+Title:		fusesmb
+Version:	@VERSION@
+Entered-date:	@ISODATE@
+Description:	Mount network neighbourhood
+		@configure_input@
+		Please edit fusesmb.lsm.in to fix the Keywords and
+		Primary-site entries, add several more lines of
+		description here if appropriate, and to delete these
+		instructions.
+Keywords:	[substitute your keywords here]
+Author: 	vincent@ricardis.tudelft.nl (Vincent Wagelaar)
+Maintained-by:	vincent@ricardis.tudelft.nl (Vincent Wagelaar)
+Primary-site:	metlab.unc.edu pub/Linux/apps/some/directory
+		31k fusesmb-@VERSION@.tar.gz
+		500  fusesmb.lsm
+Alternate-site: 
+Original-site:  
+Platforms:      
+Copying-policy:	GNU copyleft
+End
