@@ -1,6 +1,6 @@
 /*
    SMB for FUSE
-   Copyright (C) 2003-2005  VIncent Wagelaar <vincent@ricardis.tudelft.nl>
+   Copyright (C) 2003-2005  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
    This program can be distributed under the terms of the GNU GPL.
    See the file COPYING.
 
@@ -118,93 +118,6 @@ static void auth_smbc_get_data( __attribute__ ((unused)) const char *server,
     }
 }
 
-static void auth_smbc_get_data2( __attribute__ ((unused))const char *server, 
-                                 __attribute__ ((unused))const char *share, 
-                                 __attribute__ ((unused))char *workgroup, 
-                                 __attribute__ ((unused))int wgmaxlen,
-                                 char *username, 
-                                 __attribute__ ((unused))int unmaxlen,
-                                 char *password, 
-                                 __attribute__ ((unused))int pwmaxlen)
-{
-    char cred_file[1024];
-    FILE *fp;
-
-    snprintf(cred_file, 1024, "%s/.smb/credentials", getenv("HOME"));
-    fp = fopen(cred_file, "r");
-    if (fp != NULL)
-    {
-        char fbuf[1024];
-
-        while (fgets(fbuf, 1024, fp) != NULL)
-        {
-            if (strncmp(fbuf, "username", 8) == 0)
-            {
-                char *begin = fbuf + 8;
-                char *end;
-
-                while (*begin == ' ' || *begin == '\t')
-                    begin++;
-                if (*begin == '=')
-                {
-                    begin++;
-                    while (*begin == ' ' || *begin == '\t')
-                        begin++;
-                    strncpy(username, begin, strlen(begin));
-                    end = username + strlen(username) - 1;
-                    while (*end == ' ' || *end == '\t' || *end == '\n'
-                           || *end == '\0')
-                    {
-                        end--;
-                    }
-                    end++;
-                    *end = '\0';
-
-                }
-            }
-            else if (strncmp(fbuf, "password", 8) == 0)
-            {
-                char *begin = fbuf + 8;
-                char *end;
-
-                while (*begin == ' ' || *begin == '\t')
-                    begin++;
-                if (*begin == '=')
-                {
-                    begin++;
-                    while (*begin == ' ' || *begin == '\t')
-                        begin++;
-                    strncpy(password, begin, strlen(begin));
-                    end = password + strlen(password) - 1;
-                    while (*end == ' ' || *end == '\t' || *end == '\n'
-                           || *end == '\0')
-                    {
-                        end--;
-                    }
-                    end++;
-                    *end = '\0';
-                }
-            }
-        }
-        if (!strlen(username))
-        {
-            char un[] = "guest";
-            char pw[] = "";
-
-            strncpy(username, un, sizeof(un));
-            strncpy(password, pw, sizeof(pw));
-        }
-    }
-    else
-    {
-        char un[] = "guest";
-        char pw[] = "";
-
-        strncpy(username, un, sizeof(un));
-        strncpy(password, pw, sizeof(pw));
-    }
-}
-
 static const char *stripworkgroup(const char *file)
 {
     unsigned int i = 0, ret = 0, goodpos = 0;
@@ -240,8 +153,7 @@ static unsigned int slashcount(const char *file)
 
 static int smb_getattr(const char *path, struct stat *stbuf)
 {
-    char smb_path[MY_MAXPATHLEN], buf[MY_MAXPATHLEN], cache_file[1024];
-    const char *goodpath;
+    char smb_path[MY_MAXPATHLEN] = "smb:/", buf[MY_MAXPATHLEN], cache_file[1024];
     int path_exists = 0;
     FILE *fp;
 
@@ -272,35 +184,29 @@ static int smb_getattr(const char *path, struct stat *stbuf)
             }
             fclose(fp);
         }
-        if (path_exists == 1)
-        {
-            stbuf->st_mode = S_IFDIR | 0755;
-            stbuf->st_nlink = 2;
-            stbuf->st_size = 4096;
-            return 0;
-        }
-        else
-        {
+        if (path_exists != 1)
             return -ENOENT;
-        }
+            
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        stbuf->st_size = 4096;
+        return 0;
+    
     }
     /* We're within a share here  */
     else
     {
-        strcpy(smb_path, "smb:/");
-        goodpath = stripworkgroup(path);
+        strcat(smb_path, stripworkgroup(path));
         pthread_mutex_lock(&ctx_mutex);
-        if (ctx->stat(ctx, strcat(smb_path, goodpath), stbuf) < 0)
+        if (ctx->stat(ctx, smb_path, stbuf) < 0)
         {
             pthread_mutex_unlock(&ctx_mutex);
             return -errno;
 
         }
-        else
-        {
-            pthread_mutex_unlock(&ctx_mutex);
-            return 0;
-        }
+        pthread_mutex_unlock(&ctx_mutex);
+        return 0;
+    
     }
 }
 
@@ -311,11 +217,15 @@ static int smb_opendir(const char *path, struct fuse_file_info *fi)
     SMBCFILE *dir;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
     strcat(smb_path, stripworkgroup(path));
-    
+    pthread_mutex_lock(&ctx_mutex);    
     dir = ctx->opendir(ctx, smb_path);
     if (dir == NULL)
+    {
+        pthread_mutex_unlock(&ctx_mutex);
         return -errno;
+    }
     fi->fh = (unsigned long)dir;
+    pthread_mutex_unlock(&ctx_mutex);
     return 0;
 }
 
@@ -324,16 +234,13 @@ static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
 {
     struct smbc_dirent *pdirent;
     //SMBCFILE *dir;
-    char smb_path[MY_MAXPATHLEN], buf[MY_MAXPATHLEN],
-        last_string[MY_MAXPATHLEN], cache_file[1024];
+    char buf[MY_MAXPATHLEN],
+         last_string[MY_MAXPATHLEN],
+         cache_file[1024];
     FILE *fp;
-    const char *goodpath = NULL;
     char *first_token;
     struct stat st;
-    
     memset(&st, 0, sizeof(st));
-    
-    goodpath = stripworkgroup(path);
     int dircount = 0;
 
     /*
@@ -371,7 +278,6 @@ static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                     {
                         //printf("%s\n",  strtok(first_token, "\n"));
                         st.st_mode = DT_DIR << 12;
-                        
                         filler(h, strtok(first_token, "\n"), &st, 0);
                         dircount++;
                         strncpy(last_string, first_token, 4096);
@@ -380,46 +286,42 @@ static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
             }
         }
         fclose(fp);
-        /* The workgroup / host and share lists don't have . and .. , so putting them in */
-        if (dircount > 0)
-        {
-            st.st_mode = DT_DIR << 12;
-            filler(h, ".", &st, 0);
-            filler(h, "..", &st, 0);
-        }
-        else
-        {
-            return -ENOENT;
-        }
 
+        if (dircount == 0)
+            return -ENOENT;
+
+        /* The workgroup / host and share lists don't have . and .. , so putting them in */
+        st.st_mode = DT_DIR << 12;
+        filler(h, ".", &st, 0);
+        filler(h, "..", &st, 0);
         return 0;
     }
     /* Listing contents of a share */
     else
     {
 
-        strcpy(smb_path, "smb:/");
         pthread_mutex_lock(&ctx_mutex);
-        //dir = ctx->opendir(ctx, strcat(smb_path, goodpath));
 
         /* Put in . and .. for shares */
-        if (slashcount(path) == 2)
+        /*if (slashcount(path) == 2)
         {
             st.st_mode = DT_DIR << 12;
             filler(h, ".", &st, 0);
             filler(h, "..", &st, 0);
-        }
-        while ((pdirent = ctx->readdir(ctx, (SMBCFILE *)fi->fh)) != NULL)
+        }*/
+        while (NULL != (pdirent = ctx->readdir(ctx, (SMBCFILE *)fi->fh)))
         {
+#if 0
             if (pdirent->smbc_type == SMBC_FILE_SHARE)
             {
-                /* Don't show hidden shares */
+                //* Don't show hidden shares */
                 if (pdirent->name[strlen(pdirent->name) - 1] != '$')
                 {
                     st.st_mode = DT_DIR << 12;
                     filler(h, pdirent->name, &st, 0);
                 }
             }
+#endif
             if (pdirent->smbc_type == SMBC_DIR)
             {
                 st.st_mode = DT_DIR << 12;
@@ -431,7 +333,6 @@ static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                 filler(h, pdirent->name, &st, 0);
             }
         }
-        //ctx->closedir(ctx, dir);
         pthread_mutex_unlock(&ctx_mutex);
     }
     return 0;
@@ -439,26 +340,22 @@ static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
 
 static int smb_releasedir(const char *path, struct fuse_file_info *fi)
 {
-    if (slashcount(path) <= 2)
-        return 0;
     (void) path;
     pthread_mutex_lock(&ctx_mutex);
-    ctx->closedir(ctx, (SMBCFILE *)fi->fh);
+    if (slashcount(path) > 2)
+        ctx->closedir(ctx, (SMBCFILE *)fi->fh);
+    /* Purge connections, especially important for Windows XP, which has a limit
+       on the number of connnections
+     */
     ctx->callbacks.purge_cached_fn(ctx);
     pthread_mutex_unlock(&ctx_mutex);
     return 0;
 }
-                
 
 static int smb_open(const char *path, struct fuse_file_info *fi)
-//static int smb_open(const char *path, int flags)
 {
     SMBCFILE *file;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
-    const char *goodpath;
-
-    //goodpath = stripworkgroup(path);
-    //strcpy(smb_path, "smb:/");
 
     /* You cannot open directories */
     if (slashcount(path) <= 3)
@@ -468,6 +365,7 @@ static int smb_open(const char *path, struct fuse_file_info *fi)
     //if((flags & 3) != O_RDONLY)
     //    return -ENOENT;
     strcat(smb_path, stripworkgroup(path));
+
     pthread_mutex_lock(&rwd_ctx_mutex);
     file = rwd_ctx->open(rwd_ctx, smb_path, fi->flags, 0);
 
@@ -476,44 +374,21 @@ static int smb_open(const char *path, struct fuse_file_info *fi)
         pthread_mutex_unlock(&rwd_ctx_mutex);
         return -errno;
     }
+
     fi->fh = (unsigned long)file;
-    //rwd_ctx->close(rwd_ctx, file);
     pthread_mutex_unlock(&rwd_ctx_mutex);
     return 0;
 }
 
 static int smb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    /* TODO:
-       Increase read buffer size... throughput is about half of what is
-       possible with libsmbclient, I'm also guessing that the open, seek, read,
-       close cycle is expensive
-
-       maybe create a cache struct with:
-
-       struct fd_cache {
-       SMBFILE *file;
-       char *path,
-       off_t offset,
-       char *buf
-
-       }
-
-     */
     SMBCFILE *file;
-    char smb_path[MY_MAXPATHLEN];
-    char *psmb_path;
-    const char *goodpath;
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
 
     //printf("%i\n", offset);
     //fflush(stdout);
 
-    /* FIXME:
-       check if path isn't longer than buffer (better use strncpy?)
-     */
-    strcpy(smb_path, "smb:/");
-    goodpath = stripworkgroup(path);
-    psmb_path = strcat(smb_path, goodpath);
+    strcat(smb_path, stripworkgroup(path));
 
     int tries = 0;              //For number of retries before failing
     ssize_t ssize;              //Returned by ctx->read
@@ -522,7 +397,7 @@ static int smb_read(const char *path, char *buf, size_t size, off_t offset, stru
     /* Ugly goto but it works ;) But IMHO easiest solution for error handling here */
     goto seek;
   top:
-    if ((file = rwd_ctx->open(rwd_ctx, psmb_path, O_RDONLY, 0)) == NULL)
+    if ((file = rwd_ctx->open(rwd_ctx, smb_path, O_RDONLY, 0)) == NULL)
     {
         /* Trying to reopen when out of memory */
         if (errno == ENOMEM)
@@ -542,7 +417,7 @@ static int smb_read(const char *path, char *buf, size_t size, off_t offset, stru
             return -errno;
         }
     }
-    fi->fh = (unsigned long) file;
+    fi->fh = (unsigned long)file;
   seek:
     if (rwd_ctx->lseek(rwd_ctx, (SMBCFILE *)fi->fh, offset, SEEK_SET) < offset)
     {
@@ -572,7 +447,6 @@ static int smb_read(const char *path, char *buf, size_t size, off_t offset, stru
             return -errno;
         }
     }
-    //rwd_ctx->close(rwd_ctx, file);
     pthread_mutex_unlock(&rwd_ctx_mutex);
     return (size_t) ssize;
 }
@@ -598,19 +472,12 @@ static int smb_write(const char *path, const char *buf, size_t size,
        }
      */
     SMBCFILE *file;
-    char smb_path[MY_MAXPATHLEN];
-    char *psmb_path;
-    const char *goodpath;
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
 
     //printf("%i\n", offset);
     //fflush(stdout);
 
-    /* FIXME
-       check if path isn't longer than buffer (better use strncpy?)
-     */
-    strcpy(smb_path, "smb:/");
-    goodpath = stripworkgroup(path);
-    psmb_path = strcat(smb_path, goodpath);
+    strcat(smb_path, stripworkgroup(path));
 
     int tries = 0;              //For number of retries before failing
     ssize_t ssize;              //Returned by ctx->read
@@ -618,7 +485,7 @@ static int smb_write(const char *path, const char *buf, size_t size,
     pthread_mutex_lock(&rwd_ctx_mutex);
     /* Ugly goto but it works ;) But IMHO easiest solution for error handling here */
   top:
-    if ((file = rwd_ctx->open(rwd_ctx, psmb_path, O_RDWR, 0)) == NULL)
+    if (NULL == (file = rwd_ctx->open(rwd_ctx, smb_path, O_RDWR, 0)))
     {
         /* Trying to reopen when out of memory */
         if (errno == ENOMEM)
@@ -632,11 +499,9 @@ static int smb_write(const char *path, const char *buf, size_t size,
             goto top;
         }
         /* Other errors from docs cannot be recovered from so returning the error */
-        else
-        {
-            pthread_mutex_unlock(&rwd_ctx_mutex);
-            return -errno;
-        }
+        pthread_mutex_unlock(&rwd_ctx_mutex);
+        return -errno;
+
     }
     if (rwd_ctx->lseek(rwd_ctx, file, offset, SEEK_SET) < offset)
     {
@@ -686,9 +551,7 @@ static int smb_release(const char *path, struct fuse_file_info *fi)
 static int smb_mknod(const char *path, mode_t mode,
                      __attribute__ ((unused)) dev_t rdev)
 {
-    char smb_path[MY_MAXPATHLEN];
-    char *psmb_path;
-    const char *goodpath;
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
     SMBCFILE *file;
 
     /* FIXME:
@@ -700,11 +563,9 @@ static int smb_mknod(const char *path, mode_t mode,
     if (slashcount(path) <= 3)
         return -EACCES;
 
-    strcpy(smb_path, "smb:/");
-    goodpath = stripworkgroup(path);
-    psmb_path = strcat(smb_path, goodpath);
+    strcat(smb_path, stripworkgroup(path));
     pthread_mutex_lock(&ctx_mutex);
-    if ((file = ctx->creat(ctx, psmb_path, mode)) == NULL)
+    if ((file = ctx->creat(ctx, smb_path, mode)) == NULL)
     {
         pthread_mutex_unlock(&ctx_mutex);
         return -errno;
@@ -735,18 +596,14 @@ static int smb_statfs(const char *path, struct statfs *fst)
 
 static int smb_unlink(const char *file)
 {
-    char smb_path[MY_MAXPATHLEN];
-    char *psmb_path;
-    const char *goodpath;
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
 
     if (slashcount(file) <= 3)
         return -EACCES;
 
-    strcpy(smb_path, "smb:/");
-    goodpath = stripworkgroup(file);
-    psmb_path = strcat(smb_path, goodpath);
+    strcat(smb_path, stripworkgroup(file));
     pthread_mutex_lock(&ctx_mutex);
-    if (ctx->unlink(ctx, psmb_path) < 0)
+    if (ctx->unlink(ctx, smb_path) < 0)
     {
         pthread_mutex_unlock(&ctx_mutex);
         return -errno;
@@ -757,19 +614,15 @@ static int smb_unlink(const char *file)
 
 static int smb_rmdir(const char *path)
 {
-    char smb_path[MY_MAXPATHLEN];
-    char *psmb_path;
-    const char *goodpath;
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
 
     if (slashcount(path) <= 3)
         return -EACCES;
 
-    strcpy(smb_path, "smb:/");
-    goodpath = stripworkgroup(path);
-    psmb_path = strcat(smb_path, goodpath);
+    strcat(smb_path, stripworkgroup(path));
     pthread_mutex_lock(&ctx_mutex);
 
-    if (ctx->rmdir(ctx, psmb_path) < 0)
+    if (ctx->rmdir(ctx, smb_path) < 0)
     {
         pthread_mutex_unlock(&ctx_mutex);
         return -errno;
@@ -780,18 +633,14 @@ static int smb_rmdir(const char *path)
 
 static int smb_mkdir(const char *path, mode_t mode)
 {
-    char smb_path[MY_MAXPATHLEN];
-    char *psmb_path;
-    const char *goodpath;
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
 
     if (slashcount(path) <= 3)
         return -EACCES;
 
-    strcpy(smb_path, "smb:/");
-    goodpath = stripworkgroup(path);
-    psmb_path = strcat(smb_path, goodpath);
+    strcat(smb_path, stripworkgroup(path));
     pthread_mutex_lock(&ctx_mutex);
-    if (ctx->mkdir(ctx, psmb_path, mode) < 0)
+    if (ctx->mkdir(ctx, smb_path, mode) < 0)
     {
         pthread_mutex_unlock(&ctx_mutex);
         return -errno;
@@ -839,56 +688,25 @@ static int smb_truncate( __attribute__ ((unused)) const char *path,
 
 static int smb_rename(const char *path, const char *new_path)
 {
-    char smb_path[MY_MAXPATHLEN], new_smb_path[MY_MAXPATHLEN];
-    char *psmb_path, *pnew_smb_path;
-    const char *goodpath, *new_goodpath;
-
-    //SMBCCTX *ctx2;
+    char smb_path[MY_MAXPATHLEN]     = "smb:/",
+         new_smb_path[MY_MAXPATHLEN] = "smb:/";
 
     if (slashcount(path) <= 3 || slashcount(new_path) <= 3)
         return -EACCES;
 
-    strcpy(smb_path, "smb:/");
-    goodpath = stripworkgroup(path);
-    psmb_path = strcat(smb_path, goodpath);
-
-    strcpy(new_smb_path, "smb:/");
-    new_goodpath = stripworkgroup(new_path);
-    pnew_smb_path = strcat(new_smb_path, new_goodpath);
-
-    //printf("%s %s\n", psmb_path, pnew_smb_path);
-    //fflush(stdout);
+    strcat(smb_path, stripworkgroup(path));
+    strcat(new_smb_path, stripworkgroup(new_path));
 
     pthread_mutex_lock(&ctx_mutex);
-    //ctx2 = smbc_new_context();
-    //ctx2->callbacks.auth_fn = auth_smbc_get_data;
-    //ctx2 = smbc_init_context(ctx2);
-    if (ctx->rename(ctx, psmb_path, ctx, pnew_smb_path) < 0)
+    if (ctx->rename(ctx, smb_path, ctx, new_smb_path) < 0)
     {
-        //smbc_free_context(ctx2, 1);
         pthread_mutex_unlock(&ctx_mutex);
         return -errno;
     }
-    //smbc_free_context(ctx2, 1);
     pthread_mutex_unlock(&ctx_mutex);
     return 0;
 }
-/*
-static int smb_release( __attribute__ ((unused)) const char *path, 
-                        __attribute__ ((unused)) int flags)
-{
-    //printf("File released: %s\n", path);
-    //fflush(stdout);
 
-    pthread_mutex_lock(&ctx_mutex);
-    ctx->callbacks.purge_cached_fn(ctx);
-    pthread_mutex_unlock(&ctx_mutex);
-    pthread_mutex_lock(&rwd_ctx_mutex);
-    rwd_ctx->callbacks.purge_cached_fn(rwd_ctx);
-    pthread_mutex_unlock(&rwd_ctx_mutex);
-    return 0;
-}
-*/
 #if 0
 static struct fuse_operations smb_oper = {
   getattr:  smb_getattr,
@@ -967,7 +785,7 @@ int main(int argc, char *argv[])
     rwd_ctx = smbc_new_context();
 
     ctx->callbacks.auth_fn = auth_smbc_get_data;
-    rwd_ctx->callbacks.auth_fn = auth_smbc_get_data2;
+    rwd_ctx->callbacks.auth_fn = auth_smbc_get_data;
 
     /* Timeout a bit bigger, by Jim Ramsay */
     ctx->timeout = 10000;       //10 seconds

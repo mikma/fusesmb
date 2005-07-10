@@ -1,3 +1,8 @@
+2005-07-10  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
+	* Ported to FUSE 2.3
+	* Connection purging on closedir and close
+	* Cleanup of path conversion
+
 2005-06-26  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
 	* Autotools improvements
