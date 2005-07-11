@@ -29,6 +29,7 @@
 /* Mutex for locking the Samba context */
 pthread_mutex_t ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t rwd_ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_t cleanup_thread;
 SMBCCTX *ctx, *rwd_ctx;
 
 static void auth_smbc_get_data( __attribute__ ((unused)) const char *server, 
@@ -117,7 +118,27 @@ static void auth_smbc_get_data( __attribute__ ((unused)) const char *server,
         strncpy(password, pw, sizeof(pw));
     }
 }
+/*
+ * Thread for cleaning up connections to hosts, current interval of
+ * 10 seconds looks reasonable
+ */
 
+void *smb_purge_thread(void *data)
+{
+    while (1)
+    {
+        sleep(10);
+        pthread_mutex_lock(&ctx_mutex);
+        ctx->callbacks.purge_cached_fn(ctx);
+        pthread_mutex_unlock(&ctx_mutex);
+
+        pthread_mutex_lock(&rwd_ctx_mutex);
+        rwd_ctx->callbacks.purge_cached_fn(rwd_ctx);
+        pthread_mutex_unlock(&rwd_ctx_mutex);
+
+    }
+    return NULL;
+}
 static const char *stripworkgroup(const char *file)
 {
     unsigned int i = 0, ret = 0, goodpos = 0;
@@ -156,7 +177,7 @@ static int smb_getattr(const char *path, struct stat *stbuf)
     char smb_path[MY_MAXPATHLEN] = "smb:/", buf[MY_MAXPATHLEN], cache_file[1024];
     int path_exists = 0;
     FILE *fp;
-
+    struct stat cache;
     memset(stbuf, 0, sizeof(struct stat));
 
     /* Check the cache for valid workgroup, hosts and shares */
@@ -172,6 +193,9 @@ static int smb_getattr(const char *path, struct stat *stbuf)
             //free(path_cp);
             if (!fp)
                 return -ENOENT;
+
+            memset(&cache, 0, sizeof(cache));
+            stat(cache_file, &cache);
             while (!feof(fp))
             {
                 fgets(buf, MY_MAXPATHLEN, fp);
@@ -186,10 +210,13 @@ static int smb_getattr(const char *path, struct stat *stbuf)
         }
         if (path_exists != 1)
             return -ENOENT;
-            
+        memset(stbuf, 0, sizeof(stbuf));
         stbuf->st_mode = S_IFDIR | 0755;
-        stbuf->st_nlink = 2;
+        stbuf->st_nlink = 3;
         stbuf->st_size = 4096;
+        stbuf->st_ctime = cache.st_ctime;
+        stbuf->st_mtime = cache.st_mtime;
+        stbuf->st_atime = cache.st_atime;
         return 0;
     
     }
@@ -347,7 +374,7 @@ static int smb_releasedir(const char *path, struct fuse_file_info *fi)
     /* Purge connections, especially important for Windows XP, which has a limit
        on the number of connnections
      */
-    ctx->callbacks.purge_cached_fn(ctx);
+    //ctx->callbacks.purge_cached_fn(ctx);
     pthread_mutex_unlock(&ctx_mutex);
     return 0;
 }
@@ -542,7 +569,6 @@ static int smb_release(const char *path, struct fuse_file_info *fi)
     (void)path;
     pthread_mutex_lock(&rwd_ctx_mutex);
     rwd_ctx->close(rwd_ctx, (SMBCFILE *)fi->fh);
-    rwd_ctx->callbacks.purge_cached_fn(rwd_ctx);
     pthread_mutex_unlock(&rwd_ctx_mutex);
     return 0;
 
@@ -707,6 +733,19 @@ static int smb_rename(const char *path, const char *new_path)
     return 0;
 }
 
+static void *smb_init()
+{
+    if (0 != pthread_create(&cleanup_thread, NULL, smb_purge_thread, NULL))
+        exit(EXIT_FAILURE);
+    return NULL;
+}
+
+static void smb_destroy(void *private_data)
+{
+    pthread_cancel(cleanup_thread);
+    pthread_join(cleanup_thread, NULL);
+}
+
 #if 0
 static struct fuse_operations smb_oper = {
   getattr:  smb_getattr,
@@ -754,6 +793,8 @@ static struct fuse_operations smb_oper = {
     .statfs     = smb_statfs,
     .release    = smb_release,
     .fsync      = NULL, //smb_fsync,
+    .init       = smb_init,
+    .destroy    = smb_destroy,
 #ifdef HAVE_SETXATTR
     .setxattr   = smb_setxattr,
     .getxattr   = smb_getxattr,
