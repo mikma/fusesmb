@@ -183,19 +183,16 @@ static int smb_getattr(const char *path, struct stat *stbuf)
     /* Check the cache for valid workgroup, hosts and shares */
     if (slashcount(path) <= 3)
     {
-
+        snprintf(cache_file, 1024, "%s/.smb/smbcache", getenv("HOME"));
+        
         if (strlen(path) == 1 && path[0] == '/')
             path_exists = 1;
         else
         {
-            snprintf(cache_file, 1024, "%s/.smb/smbcache", getenv("HOME"));
             fp = fopen(cache_file, "r");
-            //free(path_cp);
             if (!fp)
                 return -ENOENT;
 
-            memset(&cache, 0, sizeof(cache));
-            stat(cache_file, &cache);
             while (!feof(fp))
             {
                 fgets(buf, MY_MAXPATHLEN, fp);
@@ -210,10 +207,15 @@ static int smb_getattr(const char *path, struct stat *stbuf)
         }
         if (path_exists != 1)
             return -ENOENT;
+
+        memset(&cache, 0, sizeof(cache));
+        stat(cache_file, &cache);
         memset(stbuf, 0, sizeof(stbuf));
-        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_mode  = S_IFDIR | 0755;
         stbuf->st_nlink = 3;
-        stbuf->st_size = 4096;
+        stbuf->st_size  = 4096;
+        stbuf->st_uid   = cache.st_uid;
+        stbuf->st_gid   = cache.st_gid;
         stbuf->st_ctime = cache.st_ctime;
         stbuf->st_mtime = cache.st_mtime;
         stbuf->st_atime = cache.st_atime;
@@ -368,13 +370,11 @@ static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
 static int smb_releasedir(const char *path, struct fuse_file_info *fi)
 {
     (void) path;
+    if (slashcount(path) <= 2)
+        return 0;
+
     pthread_mutex_lock(&ctx_mutex);
-    if (slashcount(path) > 2)
-        ctx->closedir(ctx, (SMBCFILE *)fi->fh);
-    /* Purge connections, especially important for Windows XP, which has a limit
-       on the number of connnections
-     */
-    //ctx->callbacks.purge_cached_fn(ctx);
+    ctx->closedir(ctx, (SMBCFILE *)fi->fh);
     pthread_mutex_unlock(&ctx_mutex);
     return 0;
 }
@@ -604,20 +604,11 @@ static int smb_mknod(const char *path, mode_t mode,
 static int smb_statfs(const char *path, struct statfs *fst)
 {
     /* Returning stat of local filesystem, call is too expensive */
-    //struct statfs st;
-    int rv = statfs("/", fst);
-#if 0
-    if (!rv)
-    {
-        fst->block_size = st.f_bsize;
-        fst->blocks = st.f_blocks;
-        fst->blocks_free = st.f_bavail;
-        fst->files = st.f_files;
-        fst->files_free = st.f_ffree;
-        fst->namelen = st.f_namelen;
-    }
-#endif
-    return rv;
+    (void)path;
+    memset(fst, 0, sizeof(struct statfs));
+    if (statfs("/", fst) != 0)
+        return -errno;
+    return 0;
 }
 
 static int smb_unlink(const char *file)
@@ -745,30 +736,6 @@ static void smb_destroy(void *private_data)
     pthread_cancel(cleanup_thread);
     pthread_join(cleanup_thread, NULL);
 }
-
-#if 0
-static struct fuse_operations smb_oper = {
-  getattr:  smb_getattr,
-  readlink: NULL,
-  getdir:   smb_getdir,
-  mknod:    smb_mknod,
-  mkdir:    smb_mkdir,
-  symlink:  NULL,
-  unlink:   smb_unlink,
-  rmdir:    smb_rmdir,
-  rename:   smb_rename,
-  link:     NULL,
-  chmod:    smb_chmod,
-  chown:    smb_chown,
-  truncate: smb_truncate,
-  utime:    smb_utime,
-  open:     smb_open,
-  read:     smb_read,
-  write:    NULL, //smb_write,
-  statfs:   smb_statfs,
-  release:  smb_release
-};
-#endif
 
 static struct fuse_operations smb_oper = {
     .getattr    = smb_getattr,
