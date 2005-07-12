@@ -43,12 +43,12 @@ signal.signal(signal.SIGALRM, alarm_handler)
 
 
 #Why isn't Popen3 properly documented?
-def getshares(wg, host, share_set):
+def getshares(wg, host, ip, share_set):
    
     if os.path.exists(os.path.expanduser( "~/.smb/credentials" )):
-        run = popen2.Popen3("smbclient -A ~/.smb/credentials -L '%s'" %(host, ))
+        run = popen2.Popen3("smbclient -A ~/.smb/credentials -I %s -L '%s'" %(ip, host))
     else:
-        run = popen2.Popen3("smbclient -N -L '%s'" % (host, ))
+        run = popen2.Popen3("smbclient -N -I %s -L '%s'" % (ip, host))
     #After ten seconds a client is considered dead
     signal.alarm(10)
 
@@ -77,7 +77,7 @@ def gethostinfo(ip):
                     host = l.split("<")[0].strip()
     fp2.close()
     if len(wg) and len(host):
-        return (wg, host)
+        return (wg, host, ip)
     return None
 
 #Find all workgroups
@@ -110,8 +110,8 @@ for ip in ip_addresses:
         host_names.add(info)
 
 share_set = Set()
-for (wg, host) in host_names:
-    getshares(wg, host, share_set)
+for (wg, host, ip) in host_names:
+    getshares(wg, host, ip, share_set)
 
 cache_path = os.path.join(os.path.expanduser("~"), ".smb")
 if not os.path.exists(cache_path):
