@@ -33,7 +33,7 @@ pthread_mutex_t rwd_ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t cleanup_thread;
 SMBCCTX *ctx, *rwd_ctx;
 
-static void auth_smbc_get_data( __attribute__ ((unused)) const char *server, 
+static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
                                 __attribute__ ((unused)) const char *share, 
                                 __attribute__ ((unused)) char *workgroup, 
                                 __attribute__ ((unused)) int wgmaxlen,
@@ -124,7 +124,7 @@ static void auth_smbc_get_data( __attribute__ ((unused)) const char *server,
  * 10 seconds looks reasonable
  */
 
-void *smb_purge_thread(void *data)
+static void *smb_purge_thread(void *data)
 {
     while (1)
     {
@@ -139,6 +139,23 @@ void *smb_purge_thread(void *data)
 
     }
     return NULL;
+}
+
+static SMBCCTX *fusesmb_new_context(SMBCCTX *ctx)
+{
+    /* Initializing libsbmclient */
+    ctx = smbc_new_context();
+    ctx->callbacks.auth_fn = fusesmb_auth_fn;
+    /* Timeout a bit bigger, by Jim Ramsay */
+    ctx->timeout = 10000;       //10 seconds
+    /* Kerberos authentication by Esben Nielsen */
+#if defined(SMB_CTX_FLAG_USE_KERBEROS) && defined(SMB_CTX_FLAG_FALLBACK_AFTER_KERBEROS)
+    ctx->flags |=
+        SMB_CTX_FLAG_USE_KERBEROS | SMB_CTX_FLAG_FALLBACK_AFTER_KERBEROS;
+#endif
+    //ctx->options.one_share_per_server = 1;
+    ctx = smbc_init_context(ctx);
+    return ctx;
 }
 static const char *stripworkgroup(const char *file)
 {
@@ -173,7 +190,7 @@ static unsigned int slashcount(const char *file)
     return count;
 }
 
-static int smb_getattr(const char *path, struct stat *stbuf)
+static int fusesmb_getattr(const char *path, struct stat *stbuf)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/", buf[MY_MAXPATHLEN], cache_file[1024];
     int path_exists = 0;
@@ -240,7 +257,7 @@ static int smb_getattr(const char *path, struct stat *stbuf)
     }
 }
 
-static int smb_opendir(const char *path, struct fuse_file_info *fi)
+static int fusesmb_opendir(const char *path, struct fuse_file_info *fi)
 {
     if (slashcount(path) <= 2)
         return 0;
@@ -259,7 +276,7 @@ static int smb_opendir(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
+static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                        off_t offset, struct fuse_file_info *fi)
 {
     struct smbc_dirent *pdirent;
@@ -368,7 +385,7 @@ static int smb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
     return 0;
 }
 
-static int smb_releasedir(const char *path, struct fuse_file_info *fi)
+static int fusesmb_releasedir(const char *path, struct fuse_file_info *fi)
 {
     (void) path;
     if (slashcount(path) <= 2)
@@ -380,7 +397,7 @@ static int smb_releasedir(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-static int smb_open(const char *path, struct fuse_file_info *fi)
+static int fusesmb_open(const char *path, struct fuse_file_info *fi)
 {
     SMBCFILE *file;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
@@ -408,7 +425,7 @@ static int smb_open(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-static int smb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     SMBCFILE *file;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
@@ -481,7 +498,7 @@ static int smb_read(const char *path, char *buf, size_t size, off_t offset, stru
 
 
 #if 0
-static int smb_write(const char *path, const char *buf, size_t size,
+static int fusesmb_write(const char *path, const char *buf, size_t size,
                      off_t offset)
 {
     /* TODO:
@@ -565,7 +582,7 @@ static int smb_write(const char *path, const char *buf, size_t size,
 }
 #endif
 
-static int smb_release(const char *path, struct fuse_file_info *fi)
+static int fusesmb_release(const char *path, struct fuse_file_info *fi)
 {
     (void)path;
     pthread_mutex_lock(&rwd_ctx_mutex);
@@ -575,7 +592,7 @@ static int smb_release(const char *path, struct fuse_file_info *fi)
 
 }
 
-static int smb_mknod(const char *path, mode_t mode,
+static int fusesmb_mknod(const char *path, mode_t mode,
                      __attribute__ ((unused)) dev_t rdev)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/";
@@ -602,7 +619,7 @@ static int smb_mknod(const char *path, mode_t mode,
     return 0;
 }
 
-static int smb_statfs(const char *path, struct statfs *fst)
+static int fusesmb_statfs(const char *path, struct statfs *fst)
 {
     /* Returning stat of local filesystem, call is too expensive */
     (void)path;
@@ -612,7 +629,7 @@ static int smb_statfs(const char *path, struct statfs *fst)
     return 0;
 }
 
-static int smb_unlink(const char *file)
+static int fusesmb_unlink(const char *file)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/";
 
@@ -630,7 +647,7 @@ static int smb_unlink(const char *file)
     return 0;
 }
 
-static int smb_rmdir(const char *path)
+static int fusesmb_rmdir(const char *path)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/";
 
@@ -649,7 +666,7 @@ static int smb_rmdir(const char *path)
     return 0;
 }
 
-static int smb_mkdir(const char *path, mode_t mode)
+static int fusesmb_mkdir(const char *path, mode_t mode)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/";
 
@@ -667,7 +684,7 @@ static int smb_mkdir(const char *path, mode_t mode)
     return 0;
 }
 
-static int smb_utime( __attribute__ ((unused)) const char *path, 
+static int fusesmb_utime( __attribute__ ((unused)) const char *path,
                       __attribute__ ((unused)) struct utimbuf *buf)
 {
     /* libsmbclient has no equivalent function for this, so
@@ -676,7 +693,7 @@ static int smb_utime( __attribute__ ((unused)) const char *path,
     return 0;
 }
 
-static int smb_chmod( __attribute__ ((unused)) const char *path, 
+static int fusesmb_chmod( __attribute__ ((unused)) const char *path,
                       __attribute__ ((unused)) mode_t mode)
 {
     /* libsmbclient has no equivalent function for this, so
@@ -684,7 +701,7 @@ static int smb_chmod( __attribute__ ((unused)) const char *path,
      */
     return 0;
 }
-static int smb_chown( __attribute__ ((unused)) const char *path,
+static int fusesmb_chown( __attribute__ ((unused)) const char *path,
                       __attribute__ ((unused)) uid_t uid,
                       __attribute__ ((unused)) gid_t gid)
 {
@@ -694,7 +711,7 @@ static int smb_chown( __attribute__ ((unused)) const char *path,
     return 0;
 }
 
-static int smb_truncate( __attribute__ ((unused)) const char *path, 
+static int fusesmb_truncate( __attribute__ ((unused)) const char *path,
                          __attribute__ ((unused)) off_t size)
 {
     /* FIXME libsmbclient has no equivalent function for this, so
@@ -704,7 +721,7 @@ static int smb_truncate( __attribute__ ((unused)) const char *path,
     return 0;
 }
 
-static int smb_rename(const char *path, const char *new_path)
+static int fusesmb_rename(const char *path, const char *new_path)
 {
     char smb_path[MY_MAXPATHLEN]     = "smb:/",
          new_smb_path[MY_MAXPATHLEN] = "smb:/";
@@ -725,49 +742,49 @@ static int smb_rename(const char *path, const char *new_path)
     return 0;
 }
 
-static void *smb_init()
+static void *fusesmb_init()
 {
     if (0 != pthread_create(&cleanup_thread, NULL, smb_purge_thread, NULL))
         exit(EXIT_FAILURE);
     return NULL;
 }
 
-static void smb_destroy(void *private_data)
+static void fusesmb_destroy(void *private_data)
 {
     pthread_cancel(cleanup_thread);
     pthread_join(cleanup_thread, NULL);
 }
 
-static struct fuse_operations smb_oper = {
-    .getattr    = smb_getattr,
-    .readlink   = NULL, //smb_readlink,
-    .opendir    = smb_opendir,
-    .readdir    = smb_readdir,
-    .releasedir = smb_releasedir,
-    .mknod      = smb_mknod,
-    .mkdir      = smb_mkdir,
-    .symlink    = NULL, //smb_symlink,
-    .unlink     = smb_unlink,
-    .rmdir      = smb_rmdir,
-    .rename     = smb_rename,
-    .link       = NULL, //smb_link,
-    .chmod      = smb_chmod,
-    .chown      = smb_chown,
-    .truncate   = smb_truncate,
-    .utime      = smb_utime,
-    .open       = smb_open,
-    .read       = smb_read,
-    .write      = NULL, //smb_write,
-    .statfs     = smb_statfs,
-    .release    = smb_release,
-    .fsync      = NULL, //smb_fsync,
-    .init       = smb_init,
-    .destroy    = smb_destroy,
+static struct fuse_operations fusesmb_oper = {
+    .getattr    = fusesmb_getattr,
+    .readlink   = NULL, //fusesmb_readlink,
+    .opendir    = fusesmb_opendir,
+    .readdir    = fusesmb_readdir,
+    .releasedir = fusesmb_releasedir,
+    .mknod      = fusesmb_mknod,
+    .mkdir      = fusesmb_mkdir,
+    .symlink    = NULL, //fusesmb_symlink,
+    .unlink     = fusesmb_unlink,
+    .rmdir      = fusesmb_rmdir,
+    .rename     = fusesmb_rename,
+    .link       = NULL, //fusesmb_link,
+    .chmod      = fusesmb_chmod,
+    .chown      = fusesmb_chown,
+    .truncate   = fusesmb_truncate,
+    .utime      = fusesmb_utime,
+    .open       = fusesmb_open,
+    .read       = fusesmb_read,
+    .write      = NULL, //fusesmb_write,
+    .statfs     = fusesmb_statfs,
+    .release    = fusesmb_release,
+    .fsync      = NULL, //fusesmb_fsync,
+    .init       = fusesmb_init,
+    .destroy    = fusesmb_destroy,
 #ifdef HAVE_SETXATTR
-    .setxattr   = smb_setxattr,
-    .getxattr   = smb_getxattr,
-    .listxattr  = smb_listxattr,
-    .removexattr= smb_removexattr,
+    .setxattr   = fusesmb_setxattr,
+    .getxattr   = fusesmb_getxattr,
+    .listxattr  = fusesmb_listxattr,
+    .removexattr= fusesmb_removexattr,
 #endif
 };
 
@@ -789,30 +806,10 @@ int main(int argc, char *argv[])
     }
     my_argv[my_argc++] = max_read;
 
-    /* Initializing libsbmclient */
-    ctx = smbc_new_context();
-    rwd_ctx = smbc_new_context();
-
-    ctx->callbacks.auth_fn = auth_smbc_get_data;
-    rwd_ctx->callbacks.auth_fn = auth_smbc_get_data;
-
-    /* Timeout a bit bigger, by Jim Ramsay */
-    ctx->timeout = 10000;       //10 seconds
-    rwd_ctx->timeout = 10000;   //10 seconds
-
-    /* Kerberos authentication by Esben Nielsen */
-#if defined(SMB_CTX_FLAG_USE_KERBEROS) && defined(SMB_CTX_FLAG_FALLBACK_AFTER_KERBEROS)
-    ctx->flags |=
-        SMB_CTX_FLAG_USE_KERBEROS | SMB_CTX_FLAG_FALLBACK_AFTER_KERBEROS;
-    rwd_ctx->flags |=
-        SMB_CTX_FLAG_USE_KERBEROS | SMB_CTX_FLAG_FALLBACK_AFTER_KERBEROS;
-#endif
-    //ctx->options.one_share_per_server = 1;
-    //rwd_ctx->options.one_share_per_server = 1;
-    ctx = smbc_init_context(ctx);
-    rwd_ctx = smbc_init_context(rwd_ctx);
-
-    fuse_main(my_argc, my_argv, &smb_oper);
+    ctx = fusesmb_new_context(ctx);
+    rwd_ctx = fusesmb_new_context(rwd_ctx);
+    
+    fuse_main(my_argc, my_argv, &fusesmb_oper);
     smbc_free_context(ctx, 1);
     smbc_free_context(rwd_ctx, 1);
     return 0;
