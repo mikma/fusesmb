@@ -1,3 +1,6 @@
+#ifndef STRINGLIST_H
+#define STRINGLIST_H
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -19,3 +22,5 @@ inline char *sl_item(stringlist_t *sl, size_t index);
 
 void sl_sort(stringlist_t *sl);
 void sl_casesort(stringlist_t *sl);
+
+#endif /* STRINGLIST_H */
