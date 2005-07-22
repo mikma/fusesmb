@@ -154,7 +154,10 @@ static void *smb_purge_thread(void *data)
         pthread_mutex_lock(&rwd_ctx_mutex);
         rwd_ctx->callbacks.purge_cached_fn(rwd_ctx);
         pthread_mutex_unlock(&rwd_ctx_mutex);
-        
+        /*
+         * Look every minute in the notfound cache for items that are
+         * no longer used
+         */
         if (count > (60 / 15)) /* 1 minute */
         {
             pthread_mutex_lock(&notfound_hash_mutex);
@@ -319,10 +322,16 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
                 pthread_mutex_lock(&notfound_hash_mutex);
                 char *key = strdup(path);
                 if (key == NULL)
+                {
+                    pthread_mutex_unlock(&notfound_hash_mutex);
                     return -errno;
+                }
                 notfound_node_t *data = (notfound_node_t *)malloc(sizeof(notfound_node_t));
                 if (data == NULL)
+                {
+                    pthread_mutex_unlock(&notfound_hash_mutex);
                     return -errno;
+                }
                 data->ctime = time(NULL);
                 data->err = err;
                 
@@ -942,8 +951,12 @@ int main(int argc, char *argv[])
     hash_scan_begin(&sc, notfound_hash);
     while (NULL != (n = hash_scan_next(&sc)))
     {
+        void *data = hnode_get(n);
+        free(data);
         const void *key = hnode_getkey(n);
         free((void *)key);
-        }
+        hash_scan_delfree(notfound_hash, n);
+    }
+    hash_destroy(notfound_hash);
     return 0;
 }
