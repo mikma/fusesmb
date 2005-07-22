@@ -50,15 +50,16 @@ typedef struct {
 } notfound_node_t;
 
 
-static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
-                                __attribute__ ((unused)) const char *share, 
-                                __attribute__ ((unused)) char *workgroup, 
-                                __attribute__ ((unused)) int wgmaxlen,
-                                char *username, 
-                                __attribute__ ((unused)) int unmaxlen,
-                                char *password, 
-                                __attribute__ ((unused)) int pwmaxlen)
+static void fusesmb_auth_fn(const char *server, const char *share,
+                            char *workgroup, int wgmaxlen,
+                            char *username, int unmaxlen,
+                            char *password, int pwmaxlen)
 {
+    (void)server;
+    (void)share;
+    (void)workgroup;
+    (void)wgmaxlen;
+
     char cred_file[1024];
     FILE *fp;
 
@@ -82,8 +83,8 @@ static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
                     begin++;
                     while (*begin == ' ' || *begin == '\t')
                         begin++;
-                    strncpy(username, begin, strlen(begin));
-                    end = username + strlen(username) - 1;
+
+                    end = begin + strlen(username) - 1;
                     while (*end == ' ' || *end == '\t' || *end == '\n'
                            || *end == '\0')
                     {
@@ -91,6 +92,7 @@ static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
                     }
                     end++;
                     *end = '\0';
+                    strncpy(username, begin, unmaxlen);
 
                 }
             }
@@ -106,8 +108,8 @@ static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
                     begin++;
                     while (*begin == ' ' || *begin == '\t')
                         begin++;
-                    strncpy(password, begin, strlen(begin));
-                    end = password + strlen(password) - 1;
+
+                    end = begin + strlen(password) - 1;
                     while (*end == ' ' || *end == '\t' || *end == '\n'
                            || *end == '\0')
                     {
@@ -115,6 +117,7 @@ static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
                     }
                     end++;
                     *end = '\0';
+                    strncpy(password, begin, pwmaxlen);
                 }
             }
         }
@@ -123,8 +126,8 @@ static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
             char un[] = "guest";
             char pw[] = "";
 
-            strncpy(username, un, sizeof(un));
-            strncpy(password, pw, sizeof(pw));
+            strncpy(username, un, unmaxlen);
+            strncpy(password, pw, pwmaxlen);
         }
     }
     else
@@ -132,8 +135,8 @@ static void fusesmb_auth_fn( __attribute__ ((unused)) const char *server,
         char un[] = "guest";
         char pw[] = "";
 
-        strncpy(username, un, sizeof(un));
-        strncpy(password, pw, sizeof(pw));
+        strncpy(username, un, unmaxlen);
+        strncpy(password, pw, pwmaxlen);
     }
 }
 /*
@@ -802,36 +805,41 @@ static int fusesmb_mkdir(const char *path, mode_t mode)
     return 0;
 }
 
-static int fusesmb_utime( __attribute__ ((unused)) const char *path,
-                      __attribute__ ((unused)) struct utimbuf *buf)
+static int fusesmb_utime(const char *path, struct utimbuf *buf)
 {
+    (void)path;
+    (void)buf;
     /* libsmbclient has no equivalent function for this, so
        always returning success
      */
     return 0;
 }
 
-static int fusesmb_chmod( __attribute__ ((unused)) const char *path,
-                      __attribute__ ((unused)) mode_t mode)
+static int fusesmb_chmod(const char *path, mode_t mode)
 {
+    (void)path;
+    (void)mode;
     /* libsmbclient has no equivalent function for this, so
        always returning success
      */
     return 0;
 }
-static int fusesmb_chown( __attribute__ ((unused)) const char *path,
-                      __attribute__ ((unused)) uid_t uid,
-                      __attribute__ ((unused)) gid_t gid)
+static int fusesmb_chown(const char *path, uid_t uid, gid_t gid)
 {
+    (void)path;
+    (void)uid;
+    (void)gid;
     /* libsmbclient has no equivalent function for this, so
        always returning success
      */
     return 0;
 }
 
-static int fusesmb_truncate( __attribute__ ((unused)) const char *path,
-                         __attribute__ ((unused)) off_t size)
+static int fusesmb_truncate(const char *path, off_t size)
 {
+
+    (void)path;
+    (void)size;
     /* FIXME libsmbclient has no equivalent function for this, so
        always returning succes, but it should only return success
        for a few cases
