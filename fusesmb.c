@@ -40,8 +40,8 @@ static SMBCCTX *ctx, *rwd_ctx;
  * for programs like konqueror and freevo that do a lot of lookups:
  * .directory, share.fxd etc..
  */
-static hash_t *notfound_hash;
-static pthread_mutex_t notfound_hash_mutex = PTHREAD_MUTEX_INITIALIZER;
+static hash_t *notfound_cache;
+static pthread_mutex_t notfound_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 typedef struct {
@@ -163,9 +163,9 @@ static void *smb_purge_thread(void *data)
          */
         if (count > (60 / 15)) /* 1 minute */
         {
-            pthread_mutex_lock(&notfound_hash_mutex);
+            pthread_mutex_lock(&notfound_cache_mutex);
             hscan_t sc;
-            hash_scan_begin(&sc, notfound_hash);
+            hash_scan_begin(&sc, notfound_cache);
             hnode_t *n;
             while (NULL != (n = hash_scan_next(&sc)))
             {
@@ -174,13 +174,13 @@ static void *smb_purge_thread(void *data)
                 {
                     const void *key = hnode_getkey(n);
                     fprintf(stderr, "Deleting notfound node: %s\n", (char *)key);
-                    hash_scan_delfree(notfound_hash, n);
+                    hash_scan_delfree(notfound_cache, n);
                     free((void *)key);
                     free(data);
                 }
 
             }
-            pthread_mutex_unlock(&notfound_hash_mutex);
+            pthread_mutex_unlock(&notfound_cache_mutex);
             count = 0;
         }
         else
@@ -300,18 +300,18 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
         /* Prevent to often connecting to a share because this is slow */
         if (slashcount(path) == 4)
         {
-            pthread_mutex_lock(&notfound_hash_mutex);
-            hnode_t *node = hash_lookup(notfound_hash, path);
+            pthread_mutex_lock(&notfound_cache_mutex);
+            hnode_t *node = hash_lookup(notfound_cache, path);
             if (node)
             {
                 fprintf(stderr, "NotFoundCache hit for: %s\n", path);
                 notfound_node_t *data = hnode_get(node);
                 int err = data->err;
                 data->ctime = time(NULL);
-                pthread_mutex_unlock(&notfound_hash_mutex);
+                pthread_mutex_unlock(&notfound_cache_mutex);
                 return -err;
             }
-            pthread_mutex_unlock(&notfound_hash_mutex);
+            pthread_mutex_unlock(&notfound_cache_mutex);
         }
 
         strcat(smb_path, stripworkgroup(path));
@@ -322,24 +322,24 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
             if (slashcount(path) == 4)
             {
                 int err = errno;
-                pthread_mutex_lock(&notfound_hash_mutex);
+                pthread_mutex_lock(&notfound_cache_mutex);
                 char *key = strdup(path);
                 if (key == NULL)
                 {
-                    pthread_mutex_unlock(&notfound_hash_mutex);
+                    pthread_mutex_unlock(&notfound_cache_mutex);
                     return -errno;
                 }
                 notfound_node_t *data = (notfound_node_t *)malloc(sizeof(notfound_node_t));
                 if (data == NULL)
                 {
-                    pthread_mutex_unlock(&notfound_hash_mutex);
+                    pthread_mutex_unlock(&notfound_cache_mutex);
                     return -errno;
                 }
                 data->ctime = time(NULL);
                 data->err = err;
 
-                hash_alloc_insert(notfound_hash, key, data);
-                pthread_mutex_unlock(&notfound_hash_mutex);
+                hash_alloc_insert(notfound_cache, key, data);
+                pthread_mutex_unlock(&notfound_cache_mutex);
             }
             return -errno;
 
@@ -475,7 +475,7 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
             }
             /*
              * When doing a directory listing, check if the item is still valid in
-             * notfound_hash
+             * notfound_cache
              */
 #if 0
             if (slashcount(path) == 3
@@ -487,17 +487,17 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                 strcat(lookup_path, pdirent->name);
                 fprintf(stderr, "Lookup path: %s\n", lookup_path);
 
-                pthread_mutex_lock(&notfound_hash_mutex);
+                pthread_mutex_lock(&notfound_cache_mutex);
 
-                hnode_t *node = hash_lookup(notfound_hash, lookup_path);
+                hnode_t *node = hash_lookup(notfound_cache, lookup_path);
                 if (node)
                 {
                     const void *key = hnode_getkey(node);
                     free((void *)key);
-                    hash_delete_free(notfound_hash, node);
+                    hash_delete_free(notfound_cache, node);
                 }
 
-                pthread_mutex_unlock(&notfound_hash_mutex);
+                pthread_mutex_unlock(&notfound_cache_mutex);
             }
 #endif
         }
@@ -913,7 +913,7 @@ int main(int argc, char *argv[])
     ctx = fusesmb_new_context(ctx);
     rwd_ctx = fusesmb_new_context(rwd_ctx);
 
-    notfound_hash = hash_create(HASHCOUNT_T_MAX, NULL, NULL);
+    notfound_cache = hash_create(HASHCOUNT_T_MAX, NULL, NULL);
 
     if (0 != pthread_create(&cleanup_thread, NULL, smb_purge_thread, NULL))
         exit(EXIT_FAILURE);
@@ -928,24 +928,24 @@ int main(int argc, char *argv[])
     smbc_free_context(rwd_ctx, 1);
 
     hscan_t sc;
-    hash_scan_begin(&sc, notfound_hash);
+    hash_scan_begin(&sc, notfound_cache);
     hnode_t *n;
     while (NULL != (n = hash_scan_next(&sc)))
     {
         fprintf(stderr, "%s\n", (char *)hnode_getkey(n));
     }
-    fprintf(stderr, "Hash size:  %lu\n", (unsigned long) hash_size(notfound_hash));
-    fprintf(stderr, "Hash count: %lu\n", (unsigned long) hash_count(notfound_hash));
+    fprintf(stderr, "Hash size:  %lu\n", (unsigned long) hash_size(notfound_cache));
+    fprintf(stderr, "Hash count: %lu\n", (unsigned long) hash_count(notfound_cache));
 
-    hash_scan_begin(&sc, notfound_hash);
+    hash_scan_begin(&sc, notfound_cache);
     while (NULL != (n = hash_scan_next(&sc)))
     {
         void *data = hnode_get(n);
         free(data);
         const void *key = hnode_getkey(n);
         free((void *)key);
-        hash_scan_delfree(notfound_hash, n);
+        hash_scan_delfree(notfound_cache, n);
     }
-    hash_destroy(notfound_hash);
+    hash_destroy(notfound_cache);
     return 0;
 }
