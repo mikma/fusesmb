@@ -84,7 +84,7 @@ static void fusesmb_auth_fn(const char *server, const char *share,
                     while (*begin == ' ' || *begin == '\t')
                         begin++;
 
-                    end = begin + strlen(username) - 1;
+                    end = begin + strlen(begin) - 1;
                     while (*end == ' ' || *end == '\t' || *end == '\n'
                            || *end == '\0')
                     {
@@ -109,7 +109,7 @@ static void fusesmb_auth_fn(const char *server, const char *share,
                     while (*begin == ' ' || *begin == '\t')
                         begin++;
 
-                    end = begin + strlen(password) - 1;
+                    end = begin + strlen(begin) - 1;
                     while (*end == ' ' || *end == '\t' || *end == '\n'
                            || *end == '\0')
                     {
