@@ -562,8 +562,8 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, 
     pthread_mutex_lock(&rwd_ctx_mutex);
     /* Ugly goto but it works ;) But IMHO easiest solution for error handling here */
     goto seek;
-  top:
-    if ((file = rwd_ctx->open(rwd_ctx, smb_path, O_RDONLY, 0)) == NULL)
+  reopen:
+    if ((file = rwd_ctx->open(rwd_ctx, smb_path, fi->flags, 0)) == NULL)
     {
         /* Trying to reopen when out of memory */
         if (errno == ENOMEM)
@@ -590,7 +590,7 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, 
         /* Bad file descriptor try to reopen */
         if (errno == EBADF)
         {
-            goto top;
+            goto reopen;
         }
         else
         {
@@ -631,8 +631,8 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
     pthread_mutex_lock(&rwd_ctx_mutex);
     /* Ugly goto but it works ;) But IMHO easiest solution for error handling here */
     goto seek;
-  top:
-    if (NULL == (file = rwd_ctx->open(rwd_ctx, smb_path, O_RDWR, 0)))
+  reopen:
+    if (NULL == (file = rwd_ctx->open(rwd_ctx, smb_path, fi->flags, 0)))
     {
         /* Trying to reopen when out of memory */
         if (errno == ENOMEM)
@@ -671,7 +671,7 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
         /* Bad file descriptor try to reopen */
         if (errno == EBADF)
         {
-            goto top;
+            goto reopen;
         }
         /* Tried opening a directory / or smb_init failed */
         else
