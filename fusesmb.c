@@ -256,7 +256,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
     if (slashcount(path) <= 3)
     {
         snprintf(cache_file, 1024, "%s/.smb/smbcache", getenv("HOME"));
-        
+
         if (strlen(path) == 1 && path[0] == '/')
             path_exists = 1;
         else
@@ -292,7 +292,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
         stbuf->st_mtime = cache.st_mtime;
         stbuf->st_atime = cache.st_atime;
         return 0;
-    
+
     }
     /* We're within a share here  */
     else
@@ -313,7 +313,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
             }
             pthread_mutex_unlock(&notfound_hash_mutex);
         }
-        
+
         strcat(smb_path, stripworkgroup(path));
         pthread_mutex_lock(&ctx_mutex);
         if (ctx->stat(ctx, smb_path, stbuf) < 0)
@@ -337,7 +337,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
                 }
                 data->ctime = time(NULL);
                 data->err = err;
-                
+
                 hash_alloc_insert(notfound_hash, key, data);
                 pthread_mutex_unlock(&notfound_hash_mutex);
             }
@@ -346,7 +346,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
         }
         pthread_mutex_unlock(&ctx_mutex);
         return 0;
-    
+
     }
 }
 
@@ -357,7 +357,7 @@ static int fusesmb_opendir(const char *path, struct fuse_file_info *fi)
     SMBCFILE *dir;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
     strcat(smb_path, stripworkgroup(path));
-    pthread_mutex_lock(&ctx_mutex);    
+    pthread_mutex_lock(&ctx_mutex);
     dir = ctx->opendir(ctx, smb_path);
     if (dir == NULL)
     {
@@ -478,7 +478,7 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
              * notfound_hash
              */
 #if 0
-            if (slashcount(path) == 3 
+            if (slashcount(path) == 3
                  && (pdirent->smbc_type == SMBC_DIR || pdirent->smbc_type == SMBC_FILE))
             {
                 char lookup_path[MAXPATHLEN];
@@ -617,31 +617,11 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, 
     return (size_t) ssize;
 }
 
-
-#if 0
 static int fusesmb_write(const char *path, const char *buf, size_t size,
                      off_t offset)
 {
-    /* TODO:
-       Increase write buffer size... throughput is about half of what is
-       possible with libsmbclient, I'm also guessing that the open, seek, read,
-       close cycle is expensive
-
-       maybe create a cache struct with:
-
-       struct fd_cache {
-       SMBFILE *file;
-       char *path,
-       off_t offset,
-       char *buf
-
-       }
-     */
     SMBCFILE *file;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
-
-    //printf("%i\n", offset);
-    //fflush(stdout);
 
     strcat(smb_path, stripworkgroup(path));
 
@@ -650,6 +630,7 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
 
     pthread_mutex_lock(&rwd_ctx_mutex);
     /* Ugly goto but it works ;) But IMHO easiest solution for error handling here */
+    goto seek;
   top:
     if (NULL == (file = rwd_ctx->open(rwd_ctx, smb_path, O_RDWR, 0)))
     {
@@ -669,6 +650,8 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
         return -errno;
 
     }
+    fi->fh = (unsigned long)file;
+  seek:
     if (rwd_ctx->lseek(rwd_ctx, file, offset, SEEK_SET) < offset)
     {
         /* Bad file descriptor try to reopen */
@@ -697,11 +680,9 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
             return -errno;
         }
     }
-    rwd_ctx->close(rwd_ctx, file);
     pthread_mutex_unlock(&rwd_ctx_mutex);
     return (size_t) ssize;
 }
-#endif
 
 static int fusesmb_release(const char *path, struct fuse_file_info *fi)
 {
