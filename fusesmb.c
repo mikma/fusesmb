@@ -574,7 +574,7 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, 
                 pthread_mutex_unlock(&rwd_ctx_mutex);
                 return -errno;
             }
-            goto top;
+            goto reopen;
         }
         /* Other errors from docs cannot be recovered from so returning the error */
         else
@@ -604,7 +604,7 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, 
         /* Bad file descriptor try to reopen */
         if (errno == EBADF)
         {
-            goto top;
+            goto reopen;
         }
         /* Tried opening a directory / or smb_init failed */
         else
@@ -617,8 +617,7 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, 
     return (size_t) ssize;
 }
 
-static int fusesmb_write(const char *path, const char *buf, size_t size,
-                     off_t offset)
+static int fusesmb_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     SMBCFILE *file;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
@@ -643,7 +642,7 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
                 pthread_mutex_unlock(&rwd_ctx_mutex);
                 return -errno;
             }
-            goto top;
+            goto reopen;
         }
         /* Other errors from docs cannot be recovered from so returning the error */
         pthread_mutex_unlock(&rwd_ctx_mutex);
@@ -652,12 +651,12 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
     }
     fi->fh = (unsigned long)file;
   seek:
-    if (rwd_ctx->lseek(rwd_ctx, file, offset, SEEK_SET) < offset)
+    if (rwd_ctx->lseek(rwd_ctx, (SMBCFILE *)fi->fh, offset, SEEK_SET) < offset)
     {
         /* Bad file descriptor try to reopen */
         if (errno == EBADF)
         {
-            goto top;
+            goto reopen;
         }
         else
         {
@@ -666,7 +665,7 @@ static int fusesmb_write(const char *path, const char *buf, size_t size,
             return -errno;
         }
     }
-    if ((ssize = rwd_ctx->write(rwd_ctx, file, (void *) buf, size)) < 0)
+    if ((ssize = rwd_ctx->write(rwd_ctx, (SMBCFILE *)fi->fh, (void *) buf, size)) < 0)
     {
         /* Bad file descriptor try to reopen */
         if (errno == EBADF)
@@ -878,7 +877,7 @@ static struct fuse_operations fusesmb_oper = {
     .utime      = fusesmb_utime,
     .open       = fusesmb_open,
     .read       = fusesmb_read,
-    .write      = NULL, //fusesmb_write,
+    .write      = fusesmb_write,
     .statfs     = fusesmb_statfs,
     .release    = fusesmb_release,
     .fsync      = NULL, //fusesmb_fsync,
