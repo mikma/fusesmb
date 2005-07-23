@@ -1,6 +1,6 @@
 bin_PROGRAMS=fusesmb
 bin_SCRIPTS=fusesmbcache
-fusesmb_SOURCES=fusesmb.c 
+fusesmb_SOURCES=fusesmb.c hash.c
 
 #  uncomment the following if fusesmb requires the math library
 
