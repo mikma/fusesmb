@@ -32,8 +32,9 @@
  */
 
 #include "stringlist.h"
+#include <strings.h>
 
-#define NUM_ROWS_PER_MALLOC 100
+#define NUM_ROWS_PER_MALLOC 128
 
 static int sl_strcmp(const void *p1, const void *p2)
 {
@@ -60,6 +61,7 @@ stringlist_t *sl_init(void)
         return NULL;
     sl->maxlines = NUM_ROWS_PER_MALLOC;
     sl->numlines = 0;
+    sl->malloclines = 0;
     sl->sorted = 0;
     return sl;
 }
@@ -88,20 +90,24 @@ void sl_free(stringlist_t *sl)
 int sl_add(stringlist_t *sl, char *str, int do_malloc)
 {
     /* resize the array if needed */
-    if (sl->numlines == sl->maxlines -1)
+    if (sl->malloclines == sl->maxlines -1)
     {
         char **new;
         new = (char **)realloc(sl->lines, (sl->maxlines + NUM_ROWS_PER_MALLOC)*sizeof(char *));
         if (new == NULL)
+        {
             return -1;
+        }
         sl->maxlines += NUM_ROWS_PER_MALLOC;
         sl->lines = new;
     }
     if (do_malloc)
     {
         sl->lines[sl->numlines] = (char *)malloc( (strlen(str)+1) * sizeof(char));
-        if (sl->lines[sl->numlines] == NULL)
+        if (NULL == sl->lines[sl->numlines])
+        {
             return -1;
+        }
         strcpy(sl->lines[sl->numlines], str);
         sl->numlines++;
         sl->sorted = 0;
@@ -109,6 +115,7 @@ int sl_add(stringlist_t *sl, char *str, int do_malloc)
    }
    sl->lines[sl->numlines] = str;
    sl->numlines++;
+   sl->malloclines++;
    sl->sorted = 0;
    return 0;
 }
@@ -128,10 +135,8 @@ char *sl_item(stringlist_t *sl, size_t index)
 {
     if (sl_count(sl) == 0)
         return NULL;
-    if (index > sl_count(sl))
-    {
+    if (index >= sl_count(sl))
         return NULL;
-    }
     return sl->lines[index];
 }
 /*
@@ -141,13 +146,17 @@ char *sl_find(stringlist_t *sl, const char *str)
 {
     /* use binary search if stringlist is sorted */
     if (sl->sorted == 1)
+    {
         return bsearch (str, sl->lines, sl_count(sl), sizeof(char *), sl_strcasecmp);
+    }
 
     size_t i;
     for (i=0; i < sl_count(sl); i++)
     {
         if (strcmp(sl_item(sl, i), str) == 0)
+        {
             return sl_item(sl, i);
+        }
     }
     return NULL;
 }
@@ -159,13 +168,17 @@ char *sl_casefind(stringlist_t *sl, const char *str)
 {
     /* use binary search if stringlist is case insensitively sorted */
     if (sl->sorted == 2)
+    {
         return bsearch (str, sl->lines, sl_count(sl), sizeof(char *), sl_strcasecmp);
+    }
 
     size_t i;
     for (i=0; i < sl_count(sl); i++)
     {
         if (strcasecmp(sl_item(sl, i), str) == 0)
+        {
             return sl_item(sl, i);
+        }
     }
     return NULL;
 }
@@ -187,3 +200,29 @@ void sl_casesort(stringlist_t *sl)
     qsort(sl->lines, sl_count(sl), sizeof(char *), sl_strcasecmp);
     sl->sorted = 2;
 }
+#if 0
+int sl_remove(stringlist_t *sl, size_t index)
+{
+    if (sl_count(sl) == 0)
+        return -1;
+    if (index >= sl_count(sl))
+        return -1;
+
+    free(sl->lines[index]);
+    sl->lines[index] = sl->lines[sl_count(sl)-1];
+    sl->numlines--;
+    sl->sorted = 0;
+    return 0;
+}
+
+
+void sl_lock(stringlist_t *sl)
+{
+    pthread_mutex_lock(sl->mutex);
+}
+
+void sl_unlock(stringlist_t *sl)
+{
+    pthread_mutex_unlock(sl->mutex);
+}
+#endif

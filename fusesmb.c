@@ -26,14 +26,16 @@
 #include <libsmbclient.h>
 #include <time.h>
 #include "hash.h"
+#include "smbctx.h"
+//#include "cache.h"
 
 #define MY_MAXPATHLEN (MAXPATHLEN + 256)
 
 /* Mutex for locking the Samba context */
 static pthread_mutex_t ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t rwd_ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_t cleanup_thread;
 static SMBCCTX *ctx, *rwd_ctx;
+pthread_t cleanup_thread;
 
 /*
  * Hash for storing files/directories that were not found, an optimisation
@@ -50,95 +52,7 @@ typedef struct {
 } notfound_node_t;
 
 
-static void fusesmb_auth_fn(const char *server, const char *share,
-                            char *workgroup, int wgmaxlen,
-                            char *username, int unmaxlen,
-                            char *password, int pwmaxlen)
-{
-    (void)server;
-    (void)share;
-    (void)workgroup;
-    (void)wgmaxlen;
 
-    char cred_file[1024];
-    FILE *fp;
-
-    snprintf(cred_file, 1024, "%s/.smb/credentials", getenv("HOME"));
-    fp = fopen(cred_file, "r");
-    if (fp != NULL)
-    {
-        char fbuf[1024];
-
-        while (fgets(fbuf, 1024, fp) != NULL)
-        {
-            if (strncmp(fbuf, "username", 8) == 0)
-            {
-                char *begin = fbuf + 8;
-                char *end;
-
-                while (*begin == ' ' || *begin == '\t')
-                    begin++;
-                if (*begin == '=')
-                {
-                    begin++;
-                    while (*begin == ' ' || *begin == '\t')
-                        begin++;
-
-                    end = begin + strlen(begin) - 1;
-                    while (*end == ' ' || *end == '\t' || *end == '\n'
-                           || *end == '\0')
-                    {
-                        end--;
-                    }
-                    end++;
-                    *end = '\0';
-                    strncpy(username, begin, unmaxlen);
-
-                }
-            }
-            else if (strncmp(fbuf, "password", 8) == 0)
-            {
-                char *begin = fbuf + 8;
-                char *end;
-
-                while (*begin == ' ' || *begin == '\t')
-                    begin++;
-                if (*begin == '=')
-                {
-                    begin++;
-                    while (*begin == ' ' || *begin == '\t')
-                        begin++;
-
-                    end = begin + strlen(begin) - 1;
-                    while (*end == ' ' || *end == '\t' || *end == '\n'
-                           || *end == '\0')
-                    {
-                        end--;
-                    }
-                    end++;
-                    *end = '\0';
-                    strncpy(password, begin, pwmaxlen);
-                }
-            }
-        }
-        if (!strlen(username))
-        {
-            char un[] = "guest";
-            char pw[] = "";
-
-            strncpy(username, un, unmaxlen);
-            strncpy(password, pw, pwmaxlen);
-        }
-    }
-    else
-    {
-        char un[] = "guest";
-        char pw[] = "";
-
-        strncpy(username, un, unmaxlen);
-        strncpy(password, pw, pwmaxlen);
-    }
-}
 /*
  * Thread for cleaning up connections to hosts, current interval of
  * 15 seconds looks reasonable
@@ -149,7 +63,7 @@ static void *smb_purge_thread(void *data)
     int count = 0;
     while (1)
     {
-        sleep(15);
+
         pthread_mutex_lock(&ctx_mutex);
         ctx->callbacks.purge_cached_fn(ctx);
         pthread_mutex_unlock(&ctx_mutex);
@@ -170,7 +84,7 @@ static void *smb_purge_thread(void *data)
             while (NULL != (n = hash_scan_next(&sc)))
             {
                 notfound_node_t *data = hnode_get(n);
-                if (time(NULL) - data->ctime > 300) /* 5 minutes */
+                if (time(NULL) - data->ctime > 15 * 60) /* 15 minutes */
                 {
                     const void *key = hnode_getkey(n);
                     fprintf(stderr, "Deleting notfound node: %s\n", (char *)key);
@@ -188,27 +102,25 @@ static void *smb_purge_thread(void *data)
             count++;
         }
 
+        char cachefile[1024];
+        snprintf(cachefile, 1024, "%s/.smb/fusesmb.cache", getenv("HOME"));
+        struct stat st;
+        memset(&st, 0, sizeof(struct stat));
+        if (-1 == stat(cachefile, &st))
+        {
+            if (errno == ENOENT)
+            {
+                system("fusesmb.cache");
+            }
+        }
+        else if (time(NULL) - st.st_mtime > 15 * 60)
+        {
+            system("fusesmb.cache");
+        }
+        sleep(15);
     }
+    /* smbc_free_context(ctx,1);*/
     return NULL;
-}
-/*
- * Create a new libsmbclient context with all necessary options
- */
-static SMBCCTX *fusesmb_new_context(SMBCCTX *ctx)
-{
-    /* Initializing libsbmclient */
-    ctx = smbc_new_context();
-    ctx->callbacks.auth_fn = fusesmb_auth_fn;
-    /* Timeout a bit bigger, by Jim Ramsay */
-    ctx->timeout = 10000;       //10 seconds
-    /* Kerberos authentication by Esben Nielsen */
-#if defined(SMB_CTX_FLAG_USE_KERBEROS) && defined(SMB_CTX_FLAG_FALLBACK_AFTER_KERBEROS)
-    ctx->flags |=
-        SMB_CTX_FLAG_USE_KERBEROS | SMB_CTX_FLAG_FALLBACK_AFTER_KERBEROS;
-#endif
-    //ctx->options.one_share_per_server = 1;
-    ctx = smbc_init_context(ctx);
-    return ctx;
 }
 
 static const char *stripworkgroup(const char *file)
@@ -255,7 +167,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
     /* Check the cache for valid workgroup, hosts and shares */
     if (slashcount(path) <= 3)
     {
-        snprintf(cache_file, 1024, "%s/.smb/smbcache", getenv("HOME"));
+        snprintf(cache_file, 1024, "%s/.smb/fusesmb.cache", getenv("HOME"));
 
         if (strlen(path) == 1 && path[0] == '/')
             path_exists = 1;
@@ -395,7 +307,7 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
     if (slashcount(path) <= 2)
     {
         /* Listing Workgroups */
-        snprintf(cache_file, 1024, "%s/.smb/smbcache", getenv("HOME"));
+        snprintf(cache_file, 1024, "%s/.smb/fusesmb.cache", getenv("HOME"));
         fp = fopen(cache_file, "r");
         if (!fp)
             return -ENOENT;
@@ -847,17 +759,23 @@ static int fusesmb_rename(const char *path, const char *new_path)
     pthread_mutex_unlock(&ctx_mutex);
     return 0;
 }
-#if 0
+
 static void *fusesmb_init()
 {
+    fprintf(stderr, "fusesmb_init\n");
+    if (0 != pthread_create(&cleanup_thread, NULL, smb_purge_thread, NULL))
+        exit(EXIT_FAILURE);
     return NULL;
 }
 
 static void fusesmb_destroy(void *private_data)
 {
     (void)private_data;
+    pthread_cancel(cleanup_thread);
+    pthread_join(cleanup_thread, NULL);
+
 }
-#endif
+
 static struct fuse_operations fusesmb_oper = {
     .getattr    = fusesmb_getattr,
     .readlink   = NULL, //fusesmb_readlink,
@@ -881,8 +799,8 @@ static struct fuse_operations fusesmb_oper = {
     .statfs     = fusesmb_statfs,
     .release    = fusesmb_release,
     .fsync      = NULL, //fusesmb_fsync,
-    .init       = NULL, //fusesmb_init,
-    .destroy    = NULL, //fusesmb_destroy,
+    .init       = fusesmb_init,
+    .destroy    = fusesmb_destroy,
 #ifdef HAVE_SETXATTR
     .setxattr   = fusesmb_setxattr,
     .getxattr   = fusesmb_getxattr,
@@ -899,7 +817,33 @@ int main(int argc, char *argv[])
      */
     int my_argc = 0, i = 0;
 
-    char **my_argv = (char **) malloc(argc + 10 * sizeof(char *));
+    /* Check if the directory for smbcache exists and if not so create it */
+    char cache_path[1024];
+    snprintf(cache_path, 1024, "%s/.smb/", getenv("HOME"));
+    struct stat st;
+    if (-1 == stat(cache_path, &st))
+    {
+        if (errno != ENOENT)
+        {
+            fprintf(stderr, strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        if (-1 == mkdir(cache_path, 0777))
+        {
+            fprintf(stderr, strerror(errno));
+            exit(EXIT_FAILURE);
+       }
+    }
+    else if (!S_ISDIR(st.st_mode))
+    {
+        fprintf(stderr, "%s is not a directory\n", cache_path);
+        exit(EXIT_FAILURE);
+    }
+
+    char **my_argv = (char **) malloc((argc + 10) * sizeof(char *));
+    if (my_argv == NULL)
+        exit(EXIT_FAILURE);
+
     char *max_read = "-omax_read=33000";
 
     for (i = 0; i < argc; i++)
@@ -909,19 +853,17 @@ int main(int argc, char *argv[])
     }
     my_argv[my_argc++] = max_read;
 
-    ctx = fusesmb_new_context(ctx);
-    rwd_ctx = fusesmb_new_context(rwd_ctx);
+    ctx = fusesmb_new_context();
+    rwd_ctx = fusesmb_new_context();
+
+    if (ctx == NULL || rwd_ctx == NULL)
+        exit(EXIT_FAILURE);
 
     notfound_cache = hash_create(HASHCOUNT_T_MAX, NULL, NULL);
-
-    if (0 != pthread_create(&cleanup_thread, NULL, smb_purge_thread, NULL))
+    if (notfound_cache == NULL)
         exit(EXIT_FAILURE);
 
     fuse_main(my_argc, my_argv, &fusesmb_oper);
-
-
-    pthread_cancel(cleanup_thread);
-    pthread_join(cleanup_thread, NULL);
 
     smbc_free_context(ctx, 1);
     smbc_free_context(rwd_ctx, 1);
@@ -940,11 +882,12 @@ int main(int argc, char *argv[])
     while (NULL != (n = hash_scan_next(&sc)))
     {
         void *data = hnode_get(n);
-        free(data);
         const void *key = hnode_getkey(n);
-        free((void *)key);
         hash_scan_delfree(notfound_cache, n);
+        free((void *)key);
+        free(data);
+
     }
     hash_destroy(notfound_cache);
-    return 0;
+    exit(EXIT_SUCCESS);
 }
