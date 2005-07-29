@@ -128,6 +128,16 @@ size_t sl_count(stringlist_t *sl)
     return sl->numlines;
 }
 
+void sl_clear(stringlist_t *sl)
+{
+    size_t i;
+    for (i=0; i < sl_count(sl); i++)
+    {
+        free( sl->lines[i] );
+    }
+    sl->numlines = 0;
+}
+
 /*
  * return the item at the index: index
  */
@@ -147,7 +157,10 @@ char *sl_find(stringlist_t *sl, const char *str)
     /* use binary search if stringlist is sorted */
     if (sl->sorted == 1)
     {
-        return bsearch (str, sl->lines, sl_count(sl), sizeof(char *), sl_strcasecmp);
+        char **res;
+        if (NULL != (res = bsearch (&str, sl->lines, sl_count(sl), sizeof(char *), sl_strcmp)))
+            return *res;
+        return NULL;
     }
 
     size_t i;
@@ -169,7 +182,10 @@ char *sl_casefind(stringlist_t *sl, const char *str)
     /* use binary search if stringlist is case insensitively sorted */
     if (sl->sorted == 2)
     {
-        return bsearch (str, sl->lines, sl_count(sl), sizeof(char *), sl_strcasecmp);
+        char **res;
+        if (NULL != (res = bsearch (&str, sl->lines, sl_count(sl), sizeof(char *), sl_strcasecmp)))
+            return *res;
+        return NULL;
     }
 
     size_t i;
