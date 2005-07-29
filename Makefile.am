@@ -1,5 +1,4 @@
 bin_PROGRAMS=fusesmb fusesmb.cache
-bin_SCRIPTS=fusesmbcache
 fusesmb_SOURCES=fusesmb.c hash.c smbctx.c stringlist.c
 fusesmb_cache_SOURCES = cache.c hash.c stringlist.c smbctx.c
 
