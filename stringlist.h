@@ -36,7 +36,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <pthread.h>
 
 typedef struct stringlist {
     char **lines;
