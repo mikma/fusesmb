@@ -8,13 +8,12 @@
 #include <ctype.h>
 #include "configfile.h"
 
-#define RUN_TEST
 
 static char *strip_whitespace_check_comment(const char *str)
 {
     char *start = (char *)str;
     char *end = start + strlen(str) -1;
-    while (isblank(*start))
+    while (*start == '\t' || *start == ' ')
         start++;
     while (isspace(*end))
     {
@@ -30,7 +29,7 @@ static char *strip_whitespace(const char *str)
 {
     char *start = (char *)str;
     char *end = start + strlen(str) -1;
-    while (isblank(*start))
+    while (*start == '\t' || *start == ' ')
         start++;
     while (isspace(*end))
     {
@@ -60,12 +59,12 @@ static int config_read_file(config_t *cf)
         if (*stripped_string == '[')
         {
             stripped_string++;
-            while (isblank(*stripped_string))
+            while (*stripped_string == '\t' || *stripped_string == ' ')
             {
                 stripped_string++;
             }
             char *end = stripped_string + strlen(stripped_string) -1;
-            while (isblank(*end) || *end == ']')
+            while (*end == '\t' || *end == ' ' || *end == ']')
             {
                 *end = '\0';
                 end--;
