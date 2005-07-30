@@ -61,7 +61,6 @@ stringlist_t *sl_init(void)
         return NULL;
     sl->maxlines = NUM_ROWS_PER_MALLOC;
     sl->numlines = 0;
-    sl->malloclines = 0;
     sl->sorted = 0;
     return sl;
 }
@@ -90,12 +89,15 @@ void sl_free(stringlist_t *sl)
 int sl_add(stringlist_t *sl, char *str, int do_malloc)
 {
     /* resize the array if needed */
-    if (sl->malloclines == sl->maxlines -1)
+    //printf("Inserting %s %i\n", str, sl->numlines);
+    if (sl->numlines == sl->maxlines)
     {
+        //printf("Realloc\n");
         char **new;
         new = (char **)realloc(sl->lines, (sl->maxlines + NUM_ROWS_PER_MALLOC)*sizeof(char *));
         if (new == NULL)
         {
+            //printf("Realloc failed\n");
             return -1;
         }
         sl->maxlines += NUM_ROWS_PER_MALLOC;
@@ -115,7 +117,6 @@ int sl_add(stringlist_t *sl, char *str, int do_malloc)
    }
    sl->lines[sl->numlines] = str;
    sl->numlines++;
-   sl->malloclines++;
    sl->sorted = 0;
    return 0;
 }

@@ -41,7 +41,6 @@ typedef struct stringlist {
     char **lines;
     size_t numlines;
     size_t maxlines;
-    size_t malloclines;
     char sorted;
 } stringlist_t;
 
