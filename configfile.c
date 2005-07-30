@@ -115,7 +115,7 @@ int config_init(config_t *cf, const char *file)
 
 /**
  * @param config_t *, pointer to config_t
- * @return -1 on failure, 1 if file has changed 0 if file has not changed
+ * @return -1 if not needed/failure, 0 file has not changed
  */
 
 int config_reload_ifneeded(config_t *cf)
@@ -268,6 +268,14 @@ int config_read_stringlist(config_t *cf, const char *section, const char *key, s
     }
     return -1;
 }
+
+void config_free(config_t *cf)
+{
+    sl_free(cf->lines);
+}
+
+#ifdef RUN_TEST
+
 static void config_show_parsed(config_t *cf)
 {
     size_t i;
@@ -277,12 +285,6 @@ static void config_show_parsed(config_t *cf)
     }
 }
 
-void config_free(config_t *cf)
-{
-    sl_free(cf->lines);
-}
-
-#ifdef RUN_TEST
 
 int keeprunning =1;
 
