@@ -115,7 +115,7 @@ int config_init(config_t *cf, const char *file)
 
 /**
  * @param config_t *, pointer to config_t
- * @return -1 if not needed/failure, 0 file has not changed
+ * @return -1 if not needed/failure, 0 file has changed
  */
 
 int config_reload_ifneeded(config_t *cf)

@@ -31,6 +31,7 @@
 
 #ifndef CONFIGFILE_H
 #define CONFIGFILE_H
+#include <sys/param.h>
 #include "stringlist.h"
 
 typedef struct {
@@ -41,7 +42,7 @@ typedef struct {
 
 int config_init(config_t *cf, const char *file);
 void config_free(config_t *cf);
-
+int config_reload_ifneeded(config_t *cf);
 int config_has_section(config_t *cf, const char *section);
 int config_read_string(config_t *cf, const char *section, const char *key, char **value);
 int config_read_int(config_t *cf, const char *section, const char *key, int *value);

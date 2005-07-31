@@ -1,6 +1,6 @@
 bin_PROGRAMS=fusesmb fusesmb.cache
-fusesmb_SOURCES=fusesmb.c hash.c smbctx.c stringlist.c
-fusesmb_cache_SOURCES = cache.c hash.c stringlist.c smbctx.c
+fusesmb_SOURCES=fusesmb.c hash.c smbctx.c stringlist.c configfile.c
+fusesmb_cache_SOURCES = cache.c hash.c stringlist.c smbctx.c configfile.c
 
 #  uncomment the following if fusesmb requires the math library
 

@@ -27,11 +27,17 @@
 #include <time.h>
 #include "hash.h"
 #include "smbctx.h"
-//#include "cache.h"
 
 #define MY_MAXPATHLEN (MAXPATHLEN + 256)
 
 /* Mutex for locking the Samba context */
+
+/* To prevent deadlock, locking order should be:
+
+[rwd]ctx_mutex -> cfg_mutex -> opts_mutex
+[rwd]ctx_mutex -> opts_mutex
+*/
+
 static pthread_mutex_t ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t rwd_ctx_mutex = PTHREAD_MUTEX_INITIALIZER;
 static SMBCCTX *ctx, *rwd_ctx;
@@ -51,6 +57,41 @@ typedef struct {
     int err;       /* errno variable */
 } notfound_node_t;
 
+struct fusesmb_opt {
+    int global_showhiddenshares;
+    int global_interval;
+    int global_timeout;
+    char *global_username;
+    char *global_password;
+};
+/* Read settings from fusesmb.conf and or set default value */
+config_t cfg;
+pthread_mutex_t cfg_mutex = PTHREAD_MUTEX_INITIALIZER;
+struct fusesmb_opt opts;
+pthread_mutex_t opts_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void options_read(config_t *cfg, struct fusesmb_opt *opt)
+{
+    if (-1 == config_read_bool(cfg, "global", "showhiddenshares", &(opt->global_showhiddenshares)))
+        opt->global_showhiddenshares = 1;
+    if (-1 == config_read_int(cfg, "global", "timeout", &(opt->global_timeout)))
+        opt->global_timeout = 10;
+    /*FIXME negative numbers */
+    if (-1 == config_read_int(cfg, "global", "interval", &(opt->global_interval)))
+        opt->global_timeout = 15;
+    if (-1 == config_read_string(cfg, "global", "username", &(opt->global_username)))
+        opt->global_username = NULL;
+    if (-1 == config_read_string(cfg, "global", "password", &(opt->global_password)))
+        opt->global_password = NULL;
+}
+
+static void options_free(struct fusesmb_opt *opt)
+{
+    if (NULL != opt->global_username)
+        free(opt->global_password);
+    if (NULL != opt->global_password)
+        free(opt->global_username);
+}
 
 
 /*
@@ -113,13 +154,41 @@ static void *smb_purge_thread(void *data)
                 system("fusesmb.cache");
             }
         }
-        else if (time(NULL) - st.st_mtime > 15 * 60)
+        else if (time(NULL) - st.st_mtime > opts.global_interval * 60)
         {
             system("fusesmb.cache");
         }
+
+
+
+        /* Look if any changes have been made to the configfile */
+        int changed;
+        pthread_mutex_lock(&cfg_mutex);
+        if (0 == (changed = config_reload_ifneeded(&cfg)))
+        {
+            /* Lookout for deadlocks !!!! (order of setting locks within locks) */
+            pthread_mutex_lock(&opts_mutex);
+            options_free(&opts);
+            options_read(&cfg, &opts);
+            pthread_mutex_unlock(&opts_mutex);
+        }
+        pthread_mutex_unlock(&cfg_mutex);
+
+        /* Prevent unnecessary locks within locks */
+        if (changed == 0)
+        {
+            pthread_mutex_lock(&ctx_mutex);
+            ctx->timeout = opts.global_timeout;
+            pthread_mutex_unlock(&ctx_mutex);
+
+            pthread_mutex_lock(&rwd_ctx_mutex);
+            rwd_ctx->timeout = opts.global_timeout;
+            pthread_mutex_unlock(&rwd_ctx_mutex);
+        }
+
+
         sleep(15);
     }
-    /* smbc_free_context(ctx,1);*/
     return NULL;
 }
 
@@ -209,7 +278,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
     /* We're within a share here  */
     else
     {
-        /* Prevent to often connecting to a share because this is slow */
+        /* Prevent connecting too often to a share because this is slow */
         if (slashcount(path) == 4)
         {
             pthread_mutex_lock(&notfound_cache_mutex);
@@ -286,12 +355,11 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
 {
     (void)offset;
     struct smbc_dirent *pdirent;
-    //SMBCFILE *dir;
     char buf[MY_MAXPATHLEN],
-         last_string[MY_MAXPATHLEN],
+         last_dir_entry[MY_MAXPATHLEN],
          cache_file[1024];
     FILE *fp;
-    char *first_token;
+    char *dir_entry;
     struct stat st;
     memset(&st, 0, sizeof(st));
     int dircount = 0;
@@ -317,24 +385,37 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
             if (strncmp(buf, path, strlen(path)) == 0 &&
                 (strlen(buf) > strlen(path)))
             {
+                /* Note: strtok is safe because the static buffer is is not reused */
                 if (buf[strlen(path)] == '/' || strlen(path) == 1)
                 {
+                    /* Path is workgroup or server */
                     if (strlen(path) > 1)
                     {
-                        first_token = strtok(&buf[strlen(path) + 1], "/");
+                        dir_entry = strtok(&buf[strlen(path) + 1], "/");
+
+                        /* Look if share is a hidden share, dir_entry still contains '\n' */
+                        if (slashcount(path) == 2 &&
+                            opts.global_showhiddenshares == 0 &&
+                            dir_entry[strlen(dir_entry)-2] == '$')
+                        {
+                            continue;
+                        }
+                        /* TODO
+                         * Server specific setting */
                     }
+                    /* Path is root */
                     else
                     {
-                        first_token = strtok(buf, "/");
+                        dir_entry = strtok(buf, "/");
                     }
-                    if (strcmp(last_string, first_token) != 0)
-                    {
-                        //printf("%s\n",  strtok(first_token, "\n"));
-                        st.st_mode = DT_DIR << 12;
-                        filler(h, strtok(first_token, "\n"), &st, 0);
-                        dircount++;
-                        strncpy(last_string, first_token, 4096);
-                    }
+                    /* Only unique workgroups or servers */
+                    if (strcmp(last_dir_entry, dir_entry) == 0)
+                        continue;
+
+                    st.st_mode = DT_DIR << 12;
+                    filler(h, strtok(dir_entry, "\n"), &st, 0);
+                    dircount++;
+                    strncpy(last_dir_entry, dir_entry, 4096);
                 }
             }
         }
@@ -352,29 +433,10 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
     /* Listing contents of a share */
     else
     {
-
         pthread_mutex_lock(&ctx_mutex);
 
-        /* Put in . and .. for shares */
-        /*if (slashcount(path) == 2)
-        {
-            st.st_mode = DT_DIR << 12;
-            filler(h, ".", &st, 0);
-            filler(h, "..", &st, 0);
-        }*/
         while (NULL != (pdirent = ctx->readdir(ctx, (SMBCFILE *)fi->fh)))
         {
-#if 0
-            if (pdirent->smbc_type == SMBC_FILE_SHARE)
-            {
-                //* Don't show hidden shares */
-                if (pdirent->name[strlen(pdirent->name) - 1] != '$')
-                {
-                    st.st_mode = DT_DIR << 12;
-                    filler(h, pdirent->name, &st, 0);
-                }
-            }
-#endif
             if (pdirent->smbc_type == SMBC_DIR)
             {
                 st.st_mode = DT_DIR << 12;
@@ -385,33 +447,6 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                 st.st_mode = DT_REG << 12;
                 filler(h, pdirent->name, &st, 0);
             }
-            /*
-             * When doing a directory listing, check if the item is still valid in
-             * notfound_cache
-             */
-#if 0
-            if (slashcount(path) == 3
-                 && (pdirent->smbc_type == SMBC_DIR || pdirent->smbc_type == SMBC_FILE))
-            {
-                char lookup_path[MAXPATHLEN];
-                strcpy(lookup_path, path);
-                strcat(lookup_path, "/");
-                strcat(lookup_path, pdirent->name);
-                fprintf(stderr, "Lookup path: %s\n", lookup_path);
-
-                pthread_mutex_lock(&notfound_cache_mutex);
-
-                hnode_t *node = hash_lookup(notfound_cache, lookup_path);
-                if (node)
-                {
-                    const void *key = hnode_getkey(node);
-                    free((void *)key);
-                    hash_delete_free(notfound_cache, node);
-                }
-
-                pthread_mutex_unlock(&notfound_cache_mutex);
-            }
-#endif
         }
         pthread_mutex_unlock(&ctx_mutex);
     }
@@ -818,6 +853,15 @@ int main(int argc, char *argv[])
     int my_argc = 0, i = 0;
 
     /* Check if the directory for smbcache exists and if not so create it */
+
+    char configfile[1024];
+    snprintf(configfile, 1024, "%s/.smb/fusesmb.conf", getenv("HOME"));
+    if (-1 == config_init(&cfg, configfile))
+    {
+        fprintf(stderr, "Could not open config file: %s (%s)", configfile, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
     char cache_path[1024];
     snprintf(cache_path, 1024, "%s/.smb/", getenv("HOME"));
     struct stat st;
@@ -844,7 +888,8 @@ int main(int argc, char *argv[])
     if (my_argv == NULL)
         exit(EXIT_FAILURE);
 
-    char *max_read = "-omax_read=33000";
+    /* libsmbclient doesn't work with reads bigger than 32k */
+    char *max_read = "-omax_read=32768";
 
     for (i = 0; i < argc; i++)
     {
@@ -853,8 +898,10 @@ int main(int argc, char *argv[])
     }
     my_argv[my_argc++] = max_read;
 
-    ctx = fusesmb_new_context();
-    rwd_ctx = fusesmb_new_context();
+    options_read(&cfg, &opts);
+
+    ctx = fusesmb_new_context(&cfg, &cfg_mutex);
+    rwd_ctx = fusesmb_new_context(&cfg, &cfg_mutex);
 
     if (ctx == NULL || rwd_ctx == NULL)
         exit(EXIT_FAILURE);
@@ -867,6 +914,9 @@ int main(int argc, char *argv[])
 
     smbc_free_context(ctx, 1);
     smbc_free_context(rwd_ctx, 1);
+
+    options_free(&opts);
+    config_free(&cfg);
 
     hscan_t sc;
     hash_scan_begin(&sc, notfound_cache);

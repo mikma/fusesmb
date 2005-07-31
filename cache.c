@@ -13,6 +13,7 @@
 #include "stringlist.h"
 #include "smbctx.h"
 #include "hash.h"
+#include "configfile.h"
 
 #define MAX_SERVERLEN 255
 #define MAX_WGLEN 255
@@ -20,6 +21,41 @@
 
 stringlist_t *cache;
 pthread_mutex_t cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct fusesmb_cache_opt {
+    stringlist_t *ignore_servers;
+    stringlist_t *ignore_workgroups;
+};
+
+config_t cfg;
+struct fusesmb_cache_opt opts;
+
+static void options_read(config_t *cfg, struct fusesmb_cache_opt *opt)
+{
+    opt->ignore_servers = NULL;
+    if (-1 == config_read_stringlist(cfg, "ignore", "servers", &(opt->ignore_servers), ','))
+    {
+        opt->ignore_servers = NULL;
+    }
+    opt->ignore_workgroups = NULL;
+    if (-1 == config_read_stringlist(cfg, "ignore", "workgroups", &(opt->ignore_workgroups), ','))
+    {
+        opt->ignore_workgroups = NULL;
+    }
+}
+
+static void options_free(struct fusesmb_cache_opt *opt)
+{
+    if (NULL != opt->ignore_servers)
+    {
+        sl_free(opt->ignore_servers);
+    }
+    if (NULL != opt->ignore_workgroups)
+    {
+        sl_free(opt->ignore_workgroups);
+    }
+}
+
 
 /*
  * Some servers refuse to return a server list using libsmbclient, so using
@@ -180,9 +216,12 @@ static int server_listing(SMBCCTX *ctx, stringlist_t *cache, const char *wg, con
 
     while (NULL != (share_dirent = ctx->readdir(ctx, dir)))
     {
-        if (share_dirent->name[strlen(share_dirent->name)-1] == '$' ||
+        if (//share_dirent->name[strlen(share_dirent->name)-1] == '$' ||
             share_dirent->smbc_type != SMBC_FILE_SHARE ||
             share_dirent->namelen == 0)
+            continue;
+        if (0 == strcmp("ADMIN$", share_dirent->name) ||
+            0 == strcmp("print$", share_dirent->name))
             continue;
         int len = strlen(wg)+ strlen(sv) + strlen(share_dirent->name) + 4;
         char tmp[len];
@@ -220,7 +259,7 @@ static void *workgroup_listing_thread(void *args)
         fprintf(stderr, "Malloc failed\n");
         return NULL;
     }
-    SMBCCTX *ctx = fusesmb_new_context();
+    SMBCCTX *ctx = fusesmb_cache_new_context(&cfg);
     SMBCFILE *dir;
     char temp_path[MAXPATHLEN] = "smb://";
     strcat(temp_path, wg);
@@ -257,7 +296,17 @@ use_popen:
     size_t i;
     for (i=0; i < sl_count(servers); i++)
     {
-        fprintf(stderr, "%s\n", sl_item(servers, i));
+        //fprintf(stderr, "%s\n", sl_item(servers, i));
+        /* Check if this server is in the ignore list in fusesmb.conf */
+        if (NULL != opts.ignore_servers)
+        {
+            if (NULL != sl_find(opts.ignore_servers, sl_item(servers, i)))
+            {
+                printf("Ignoring %s\n", sl_item(servers, i));
+                continue;
+            }
+        }
+
         if (i > 0 && strcmp(sl_item(servers, i), sl_item(servers, i-1)) == 0)
             continue;
         hnode_t *node = hash_lookup(ip_cache, sl_item(servers, i));
@@ -327,6 +376,16 @@ int cache_servers(SMBCCTX *ctx)
         //char wg[1024];
         //strncpy(wg, workgroup_dirent->name, 1024);
         char *thread_arg = strdup(workgroup_dirent->name);
+
+        if (opts.ignore_workgroups != NULL)
+        {
+            if (NULL != sl_find(opts.ignore_workgroups, workgroup_dirent->name))
+            {
+                printf("ignoring wg: %s\n", workgroup_dirent->name);
+                continue;
+            }
+        }
+
         if (NULL == thread_arg)
             continue;
         int rc;
@@ -387,6 +446,16 @@ int main(int argc, char *argv[])
 {
     char pidfile[1024];
     snprintf(pidfile, 1024, "%s/.smb/fusesmb.cache.pid", getenv("HOME"));
+
+    char configfile[1024];
+    snprintf(configfile, 1024, "%s/.smb/fusesmb.conf", getenv("HOME"));
+    if (-1 == config_init(&cfg, configfile))
+    {
+        fprintf(stderr, "Could not open config file: %s (%s)", configfile, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    options_read(&cfg, &opts);
+
     struct stat st;
     if (argc == 1)
     {
@@ -394,8 +463,13 @@ int main(int argc, char *argv[])
 
         if (-1 != stat(pidfile, &st))
         {
-            fprintf(stderr, "Error: %s is already running\n", argv[0]);
-            exit(EXIT_FAILURE);
+            if (time(NULL) - st.st_mtime > 30*60)
+                unlink(pidfile);
+            else
+            {
+                fprintf(stderr, "Error: %s is already running\n", argv[0]);
+                exit(EXIT_FAILURE);
+            }
         }
 
         pid = fork();
@@ -422,9 +496,10 @@ int main(int argc, char *argv[])
         close(STDOUT_FILENO);
         close(STDERR_FILENO);
     }
-    SMBCCTX *ctx = fusesmb_new_context();
+    SMBCCTX *ctx = fusesmb_cache_new_context(&cfg);
     cache_servers(ctx);
     smbc_free_context(ctx, 1);
+    options_free(&opts);
     if (argc == 1)
     {
         unlink(pidfile);
