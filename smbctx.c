@@ -73,14 +73,15 @@ static void fusesmb_auth_fn(const char *server, const char *share,
                             char *username, int unmaxlen,
                             char *password, int pwmaxlen)
 {
-    //(void)server;
-    //(void)share;
     (void)workgroup;
     (void)wgmaxlen;
 
-    /* No nmblookup necessary because not using ip's here */
+    /* Look for username, password for /SERVER/SHARE in the config file */
     char sv_section[1024] = "/";
     strcat(sv_section, server);
+    strcat(sv_section, "/");
+    strcat(sv_section, share);
+
     char *un, *pw;
     pthread_mutex_lock(fusesmb_auth_fn_cfg_mutex);
     if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "username", &un))
@@ -98,8 +99,9 @@ static void fusesmb_auth_fn(const char *server, const char *share,
         free(un);
     }
 
-    strcat(sv_section, "/");
-    strcat(sv_section, share);
+    /* Look for username, password for /SERVER in the config file */
+    strcpy(sv_section, "/");
+    strcat(sv_section, server);
 
     if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "username", &un))
     {
@@ -115,6 +117,8 @@ static void fusesmb_auth_fn(const char *server, const char *share,
         }
         free(un);
     }
+
+    /* Look for global username, password in the config file */
     if (0 == config_read_string(fusesmb_auth_fn_cfg, "global", "username", &un))
     {
         if (0 == config_read_string(fusesmb_auth_fn_cfg, "global", "password", &pw))
@@ -143,54 +147,11 @@ static void fusesmb_cache_auth_fn(const char *server, const char *share,
     (void)workgroup;
     (void)wgmaxlen;
     char sv[1024];
+    /* Convert ip to server name */
     nmblookup(server, sv, 1024);
-    char sv_section[1024] = "/";
-    strcat(sv_section, sv);
-    char *un, *pw;
-    if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "username", &un))
-    {
-        if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "password", &pw))
-        {
-            printf("%s, %s, %s\n", sv_section, un, pw);
-            strncpy(username, un, unmaxlen);
-            strncpy(password, pw, pwmaxlen);
-            free(un);
-            free(pw);
-            return;
-        }
-        free(un);
-    }
-    strcat(sv_section, "/");
-    strcat(sv_section, share);
-    if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "username", &un))
-    {
-        if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "password", &pw))
-        {
-            printf("%s, %s, %s\n", sv_section, un, pw);
-            strncpy(username, un, unmaxlen);
-            strncpy(password, pw, pwmaxlen);
-            free(un);
-            free(pw);
-            return;
-        }
-        free(un);
-    }
-    if (0 == config_read_string(fusesmb_auth_fn_cfg, "global", "username", &un))
-    {
-        if (0 == config_read_string(fusesmb_auth_fn_cfg, "global", "password", &pw))
-        {
-            printf("%s, %s, %s\n", sv_section, un, pw);
-            strncpy(username, un, unmaxlen);
-            strncpy(password, pw, pwmaxlen);
-            free(un);
-            free(pw);
-            return;
-        }
-        free(un);
-    }
-    username = NULL;
-    password = NULL;
-    return;
+    fusesmb_auth_fn(sv, share, workgroup, wgmaxlen,
+                    username, unmaxlen,
+                    password, pwmaxlen);
 }
 
 /*
