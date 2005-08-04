@@ -149,9 +149,65 @@ static void fusesmb_cache_auth_fn(const char *server, const char *share,
     char sv[1024];
     /* Convert ip to server name */
     nmblookup(server, sv, 1024);
-    fusesmb_auth_fn(sv, share, workgroup, wgmaxlen,
-                    username, unmaxlen,
-                    password, pwmaxlen);
+    (void)workgroup;
+    (void)wgmaxlen;
+
+    /* Look for username, password for /SERVER/SHARE in the config file */
+    char sv_section[1024] = "/";
+    strcat(sv_section, sv);
+    strcat(sv_section, "/");
+    strcat(sv_section, share);
+
+    char *un, *pw;
+    if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "username", &un))
+    {
+        if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "password", &pw))
+        {
+            printf("%s, %s, %s\n", sv_section, un, pw);
+            strncpy(username, un, unmaxlen);
+            strncpy(password, pw, pwmaxlen);
+            free(un);
+            free(pw);
+            return;
+        }
+        free(un);
+    }
+
+    /* Look for username, password for /SERVER in the config file */
+    strcpy(sv_section, "/");
+    strcat(sv_section, sv);
+
+    if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "username", &un))
+    {
+        if (0 == config_read_string(fusesmb_auth_fn_cfg, sv_section, "password", &pw))
+        {
+            printf("%s, %s, %s\n", sv_section, un, pw);
+            strncpy(username, un, unmaxlen);
+            strncpy(password, pw, pwmaxlen);
+            free(un);
+            free(pw);
+            return;
+        }
+        free(un);
+    }
+
+    /* Look for global username, password in the config file */
+    if (0 == config_read_string(fusesmb_auth_fn_cfg, "global", "username", &un))
+    {
+        if (0 == config_read_string(fusesmb_auth_fn_cfg, "global", "password", &pw))
+        {
+            printf("%s, %s, %s\n", sv_section, un, pw);
+            strncpy(username, un, unmaxlen);
+            strncpy(password, pw, pwmaxlen);
+            free(un);
+            free(pw);
+            return;
+        }
+        free(un);
+    }
+    username = NULL;
+    password = NULL;
+    return;
 }
 
 /*
