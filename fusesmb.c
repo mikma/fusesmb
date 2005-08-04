@@ -76,9 +76,16 @@ static void options_read(config_t *cfg, struct fusesmb_opt *opt)
         opt->global_showhiddenshares = 1;
     if (-1 == config_read_int(cfg, "global", "timeout", &(opt->global_timeout)))
         opt->global_timeout = 10;
-    /*FIXME negative numbers */
+
+    /* Timeout less then 2 seconds is not really useful */
+    if(opt->global_timeout <= 2)
+        opt->global_timeout = 2;
+
     if (-1 == config_read_int(cfg, "global", "interval", &(opt->global_interval)))
-        opt->global_timeout = 15;
+        opt->global_interval = 15;
+    if (opt->global_interval <= 0)
+        opt->global_interval = 0;
+
     if (-1 == config_read_string(cfg, "global", "username", &(opt->global_username)))
         opt->global_username = NULL;
     if (-1 == config_read_string(cfg, "global", "password", &(opt->global_password)))
@@ -147,18 +154,21 @@ static void *smb_purge_thread(void *data)
         snprintf(cachefile, 1024, "%s/.smb/fusesmb.cache", getenv("HOME"));
         struct stat st;
         memset(&st, 0, sizeof(struct stat));
-        if (-1 == stat(cachefile, &st))
+
+        if(opts.global_interval > 0)
         {
-            if (errno == ENOENT)
+            if (-1 == stat(cachefile, &st))
+            {
+                if (errno == ENOENT)
+                {
+                    system("fusesmb.cache");
+                }
+            }
+            else if (time(NULL) - st.st_mtime > opts.global_interval * 60)
             {
                 system("fusesmb.cache");
             }
         }
-        else if (time(NULL) - st.st_mtime > opts.global_interval * 60)
-        {
-            system("fusesmb.cache");
-        }
-
 
 
         /* Look if any changes have been made to the configfile */
@@ -178,11 +188,11 @@ static void *smb_purge_thread(void *data)
         if (changed == 0)
         {
             pthread_mutex_lock(&ctx_mutex);
-            ctx->timeout = opts.global_timeout;
+            ctx->timeout = opts.global_timeout * 1000;
             pthread_mutex_unlock(&ctx_mutex);
 
             pthread_mutex_lock(&rwd_ctx_mutex);
-            rwd_ctx->timeout = opts.global_timeout;
+            rwd_ctx->timeout = opts.global_timeout * 1000;
             pthread_mutex_unlock(&rwd_ctx_mutex);
         }
 
@@ -381,7 +391,9 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
             return -ENOENT;
         while (!feof(fp))
         {
-            fgets(buf, sizeof(buf), fp);
+            if (NULL == fgets(buf, sizeof(buf), fp))
+                continue;
+
             if (strncmp(buf, path, strlen(path)) == 0 &&
                 (strlen(buf) > strlen(path)))
             {
@@ -394,14 +406,20 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                         dir_entry = strtok(&buf[strlen(path) + 1], "/");
 
                         /* Look if share is a hidden share, dir_entry still contains '\n' */
-                        if (slashcount(path) == 2 &&
-                            opts.global_showhiddenshares == 0 &&
-                            dir_entry[strlen(dir_entry)-2] == '$')
+                        if (slashcount(path) == 2)
                         {
-                            continue;
+                            if (dir_entry[strlen(dir_entry)-2] == '$')
+                            {
+                                int showhidden = 0;
+                                if (0 == config_read_bool(&cfg, stripworkgroup(path), "showhiddenshares", &showhidden))
+                                {
+                                    if (showhidden == 1)
+                                        continue;
+                                }
+                                if (opts.global_showhiddenshares == 0)
+                                    continue;
+                            }
                         }
-                        /* TODO
-                         * Server specific setting */
                     }
                     /* Path is root */
                     else
