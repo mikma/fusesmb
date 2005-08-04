@@ -296,7 +296,9 @@ use_popen:
     size_t i;
     for (i=0; i < sl_count(servers); i++)
     {
-        //fprintf(stderr, "%s\n", sl_item(servers, i));
+        if (i > 0 && strcmp(sl_item(servers, i), sl_item(servers, i-1)) == 0)
+            continue;
+
         /* Check if this server is in the ignore list in fusesmb.conf */
         if (NULL != opts.ignore_servers)
         {
@@ -306,9 +308,17 @@ use_popen:
                 continue;
             }
         }
+        char sv[1024] = "/";
+        strcat(sv, sl_item(servers, i));
+        int ignore = 0;
 
-        if (i > 0 && strcmp(sl_item(servers, i), sl_item(servers, i-1)) == 0)
-            continue;
+        /* Check if server specific option says ignore */
+        if (0 == config_read_bool(&cfg, sv, "ignore", &ignore))
+        {
+            if (ignore == 1)
+                continue;
+        }
+
         hnode_t *node = hash_lookup(ip_cache, sl_item(servers, i));
         if (node == NULL)
             server_listing(ctx, cache, wg, sl_item(servers, i), NULL);
