@@ -21,10 +21,6 @@ AC_CANONICAL_HOST
 dnl Checks for programs.
 AC_PROG_INSTALL
 AC_PROG_CC
-AC_CHECK_PROG(SMBCLIENT,smbclient,yes,no)
-test $SMBCLIENT = no && AC_MSG_ERROR([Please install smbclient.])
-AC_CHECK_PROG(PYTHON,python,yes,no)
-test $PYTHON = no && AC_MSG_ERROR([Please install Python >= 2.3.])
 AC_CHECK_PROG(NMBLOOKUP,nmblookup,yes,no)
 test $NMBLOOKUP = no && AC_MSG_ERROR([Please install nmblookup.])
 

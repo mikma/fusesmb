@@ -296,6 +296,7 @@ use_popen:
     size_t i;
     for (i=0; i < sl_count(servers); i++)
     {
+        /* Skip duplicates */
         if (i > 0 && strcmp(sl_item(servers, i), sl_item(servers, i-1)) == 0)
             continue;
 
