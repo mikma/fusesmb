@@ -160,22 +160,20 @@ int config_read_string(config_t *cf, const char *section, const char *key, char 
     char section_found = 0;
     for (i=0; i<sl_count(cf->lines); i++)
     {
-        if (0 == strncmp(sl_item(cf->lines, i), cmp_section, sizeof(cmp_section))
+        if (0 == strncasecmp(sl_item(cf->lines, i), cmp_section, sizeof(cmp_section))
             && section_found == 0)
         {
             section_found = 1;
-            //printf("Section %s\n", cmp_section);
             i++;
         }
         if (section_found == 1)
         {
-            if (0 == strncmp(sl_item(cf->lines, i), "[", 1))
+            if (0 == strncasecmp(sl_item(cf->lines, i), "[", 1))
             {
                 return -1;
             }
-            if (0 == strncmp(sl_item(cf->lines, i), cmp_key, strlen(cmp_key)))
+            if (0 == strncasecmp(sl_item(cf->lines, i), cmp_key, strlen(cmp_key)))
             {
-                //printf("%s\n", sl_item(cf->lines, i));
                 char *retval = index(sl_item(cf->lines, i), '=');
                 retval++;
                 if (strlen(retval))
@@ -217,13 +215,13 @@ int config_read_bool(config_t *cf, const char *section, const char *key, int *va
     char *str;
     if (0 == config_read_string(cf, section, key, &str))
     {
-        if (strcmp("true", str) == 0 || strcmp("1", str) == 0)
+        if (strcasecmp("true", str) == 0 || strcmp("1", str) == 0)
         {
             *value = 1;
             free(str);
             return 0;
         }
-        if (strcmp("false", str) == 0 || strcmp("0", str) == 0)
+        if (strcasecmp("false", str) == 0 || strcmp("0", str) == 0)
         {
             *value = 0;
             free(str);
