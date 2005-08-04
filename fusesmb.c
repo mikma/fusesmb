@@ -411,13 +411,22 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                             if (dir_entry[strlen(dir_entry)-2] == '$')
                             {
                                 int showhidden = 0;
+                                pthread_mutex_lock(&cfg_mutex);
                                 if (0 == config_read_bool(&cfg, stripworkgroup(path), "showhiddenshares", &showhidden))
                                 {
+                                    pthread_mutex_unlock(&cfg_mutex);
                                     if (showhidden == 1)
                                         continue;
                                 }
+                                pthread_mutex_unlock(&cfg_mutex);
+
+                                pthread_mutex_lock(&opts_mutex);
                                 if (opts.global_showhiddenshares == 0)
+                                {
+                                    pthread_mutex_unlock(&opts_mutex);
                                     continue;
+                                }
+                                pthread_mutex_unlock(&opts_mutex);
                             }
                         }
                     }
@@ -872,14 +881,6 @@ int main(int argc, char *argv[])
 
     /* Check if the directory for smbcache exists and if not so create it */
 
-    char configfile[1024];
-    snprintf(configfile, 1024, "%s/.smb/fusesmb.conf", getenv("HOME"));
-    if (-1 == config_init(&cfg, configfile))
-    {
-        fprintf(stderr, "Could not open config file: %s (%s)", configfile, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
     char cache_path[1024];
     snprintf(cache_path, 1024, "%s/.smb/", getenv("HOME"));
     struct stat st;
@@ -899,6 +900,44 @@ int main(int argc, char *argv[])
     else if (!S_ISDIR(st.st_mode))
     {
         fprintf(stderr, "%s is not a directory\n", cache_path);
+        exit(EXIT_FAILURE);
+    }
+
+    char configfile[1024];
+    snprintf(configfile, 1024, "%s/.smb/fusesmb.conf", getenv("HOME"));
+    if (-1 == stat(configfile, &st))
+    {
+        if (errno != ENOENT)
+        {
+            fprintf(stderr, strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        int fd;
+        /* Create configfile with read-write permissions for the owner */
+        if (-1 == (fd = open(configfile, O_WRONLY | O_CREAT, 00600)))
+        {
+            fprintf(stderr, strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        close(fd);
+    }
+    else
+    {
+        /* Check if configfile is only accessible by the owner */
+        if ((st.st_mode & 07777) != (07777 & 00700) ||
+             (st.st_mode & 07777) != (07777 & 00600) ||
+             (st.st_mode & 07777) != (07777 & 00400))
+        {
+            fprintf(stderr, "For security reasons the config file: %s\n"
+                            "should only be readable by the owner. You can correct the permissions by typing:\n"
+                            " chmod 600 %s\n", configfile, configfile);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    if (-1 == config_init(&cfg, configfile))
+    {
+        fprintf(stderr, "Could not open config file: %s (%s)", configfile, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
