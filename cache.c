@@ -143,6 +143,16 @@ static int nmblookup(const char *wg, stringlist_t *sl, hash_t *ipcache)
         char *start = buf;
         if (NULL == fgets(buf2, 4096, pipe))
             continue;
+        /* Parse following input:
+            Looking up status of 123.123.123.123
+                    SERVER          <00> -         B <ACTIVE>
+                    SERVER          <03> -         B <ACTIVE>
+                    SERVER          <20> -         B <ACTIVE>
+                    ..__MSBROWSE__. <01> - <GROUP> B <ACTIVE>
+                    WORKGROUP       <00> - <GROUP> B <ACTIVE>
+                    WORKGROUP       <1d> -         B <ACTIVE>
+                    WORKGROUP       <1e> - <GROUP> B <ACTIVE>
+        */
         if (strncmp(buf2, "Looking up status of ", strlen("Looking up status of ")) == 0)
         {
             char *tmp = rindex(buf2, ' ');
