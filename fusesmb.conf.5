@@ -4,13 +4,10 @@
 fusesmb.conf \- the configuration file for \fBfusesmb\fR
 
 .SH FILE FORMAT
-.PP
 The file consists of sections and parameters. A section begins with the name of the section in square
-brackets and continues until the next section begins. Sections contain parameters of the form
-.TP
-\fIname\fR = \fIvalue\fR
-.PP
-The file is line-based - that is, each newline-terminated line represents either a comment, a section name or a parameter.
+brackets and continues until the next section begins. Sections contain parameters of the form: \fIname\fR = \fIvalue\fR.
+
+The file is line-based \- that is, each newline\-terminated line represents either a comment, a section name or a parameter.
 .PP
 Section and parameter names are not case sensitive.
 .PP
@@ -21,13 +18,14 @@ in a parameter value is discarded. Internal whitespace within a parameter value 
 Any  line beginning with a semicolon (``\fB;\fR'') or a hash (``\fB#\fR'') character is ignored, as are lines containing only whitespace.
 
 .SH SPECIAL SECTIONS
-\fBfusesmb\fP can contain the following sections:
+.B fusesmb.conf
+can contain the following sections:
 .TP
 The \fB[global]\fR section
 Section for global parameters.
 .TP
 The \fB[ignore]\fR section
-Section for putting in servers or workgroups to ignore.
+Section for specifying servers and/or workgroups that should not be listed.
 .TP
 The \fB[/\fISERVER\fR\fB]\fR section
 Section for server-specific settings. The section name should start with a slash ``\fB/\fR'' and not end with a slash.
@@ -36,61 +34,57 @@ The \fB[/\fISERVER\fB/\fISHARE\fB]\fR
 Section for share-specific settings. The section name should start with a slash followed by the server name followed by a slash ending on the share name. It should not end with a slash.
 
 .SH EXPLANATION OF EACH PARAMETER
-.PP
-The section has a list of each possible option within a section. The section the option is applicable to is specified between parentheses. For example: ( [global] ) specifies that the option is only possible in the section [global].
-
+This chapter explains each possible option. The section names - specified between parentheses after each option - shows the applicable sections for this option. For example: ( [global] ) specifies that this option is only possible for the section [global].
 .TP
-showhiddenshares ( [global], [/SERVER] )
-Show hidden shares. Possible values are: true, false, 1 and 0.
-
-Example: showhiddenshares = false
-
-.TP
-servers ( [ignore] )
-Servers to ignore. Value is each server to ignore separated by a comma.
-
-Example: servers = SERVER1, SERVER2, SERVER3
-
-.TP
-workgroups ( [ignore] )
-Workgroups to ignore. Value is each workgroup to ignore separated by a comma.
-
-Example: workgroups = WORKGROUP1, WORKGROUP2
-
-.TP
-username ( [global], [/SERVER], [/SERVER/SHARE] )
-Username. Value is string containing the username.
-
-Example: username = johndoe
-
-.TP
-password ( [global], [/SERVER], [/SERVER/SHARE] )
-Password. Value is string containing the password.
-
-Example: password = secret
-
-.TP
-timeout ( [global] )
-Connection timeout in seconds. A server after this timeout is considered offline. Values smaller than 2 seconds are ignored.
-
-Example: timeout = 10
-
-.TP
-interval ( [global] )
-Interval for scanning the network for shares in minutes. Value is a number that specifies the network scanning interval in minutes. If the value is smaller or equal to zero the network is not scanned.
-
-Example: interval = 20
-
-.TP
-ignore ( [/SERVER] )
+\fBignore\fR ( [/SERVER] )
 Ignore this server. Possible values are: true, false, 1 and 0.
 
-Example: ignore = true
+Example: \fIignore\fR = \fItrue\fR
+.TP
+\fBinterval\fR ( [global] )
+Interval for scanning the network for shares. Value is a number that specifies the network scanning interval in minutes. If the value is smaller or equal to zero the network is not scanned.
+
+Example: \fIinterval\fR = \fI20\fR
+.TP
+\fBpassword\fR ( [global], [/SERVER], [/SERVER/SHARE] )
+Password. Value is string containing the password.
+
+Example: \fIpassword\fR = \fIsecret\fR
+.TP
+\fBservers\fR ( [ignore] )
+Servers to ignore. Value is each server to ignore separated by a comma.
+
+Example: \fIservers\fR = \fISERVER1, SERVER2, SERVER3\fR
+
+.TP
+\fBshowhiddenshares\fR ( [global], [/SERVER] )
+Show hidden shares. Possible values are: true, false, 1 and 0.
+
+Example: \fIshowhiddenshares\fR = \fIfalse\fR
+
+.TP
+\fBtimeout\fR ( [global] )
+Connection timeout in seconds. A server after this timeout is considered offline. Values smaller than 2 seconds are ignored.
+
+Example: \fItimeout\fR = \fI10\fR
+
+.TP
+\fBusername\fR ( [global], [/SERVER], [/SERVER/SHARE] )
+Username. Value is string containing the username.
+
+Example: \fIusername\fR = \fIjohndoe\fR
+
+.TP
+\fBworkgroups\fR ( [ignore] )
+Workgroups to ignore. Value is each workgroup to ignore separated by a comma.
+
+Example: \fIworkgroups\fR = \fIWORKGROUP1, WORKGROUP2\fR
+
 
 .SH EXAMPLE
 .nf
 ; Global settings
-[global]
+.B [global]
 
 ; Default username and password
 username=user
@@ -106,19 +100,19 @@ timeout = 10
 interval = 10
 
 ; Section for servers and/or workgroups to ignore
-[ignore]
+.B [ignore]
 servers=SERVER,SERVER2,SERVER3
 workgroups=WORKGROUP,WG2
 
 ; Share-specific settings
-[/SERVER/SHARE]
+.B [/SERVER/SHARE]
 username=john
 password=doe
 
 ; Server-specific settings
-[/SERVER]
-username=vincent
-password=banaan
+.B [/SERVER]
+username=jane
+password=doe
 showhiddenshares=true
 ignore=true
 .fi
