@@ -1,36 +1,41 @@
-Installation
-============
 
-./configure
-make
-make install
+Installations instructions for SMB for FUSE
+===============================================================================
 
-if this succeeds then add an entry to your crontab:
-using crontab -e adding the following line as the user who is going to use
-the program:
+Installation/compiling
+-------------------------------------------------------------------------------
+To compile type:
 
-*/30 * * * * fusesmbcache &> /dev/null
+ $ ./configure
+ $ make
+ $ su
 
-than you're ready to run:
+(enter root password)
+ # make install
 
-fusermount <mountpoint> fusesmb
+Running
+-------------------------------------------------------------------------------
+To run SMB for FUSE type - as normal user:
 
-or:
+ $ fusesmb <mountpoint>
 
-fusesmb <mountpoint>
+On the first run your network will be scanned for available servers. This could
+take a while depending on the number of computers in your network.
 
-If your network needs authentication you can add a file:
+When scanning is finished you can now enter the <mountpoint> to browse your
+network.
 
-~/.smb/credentials
+Configuration
+-------------------------------------------------------------------------------
+If you need authentication you can edit the file ~/.smb/fusesmb.conf . An
+example of this file with comments for every available option is shown in
+fusesmb.conf.ex .
 
-with the following two lines:
+Note for users of previous versions
+-------------------------------------------------------------------------------
+SMB for FUSE doesn't use cron anymore for network scanning. You can remove the
+scanner from your crontab by typing:
 
-username = <username>
-password = <password>
+ $ crontab -e
 
-Both the network scanner - fusesmbcache - and fusesmb will then use this
-file for authentication.
-
-You can now browse the network!
-
-Have fun!
+Then delete the line containing fusesmbcache.
