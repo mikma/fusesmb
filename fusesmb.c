@@ -924,13 +924,13 @@ int main(int argc, char *argv[])
     else
     {
         /* Check if configfile is only accessible by the owner */
-        if ((st.st_mode & 07777) != (07777 & 00700) ||
-             (st.st_mode & 07777) != (07777 & 00600) ||
-             (st.st_mode & 07777) != (07777 & 00400))
+        if ((st.st_mode & 00777) != 00700 &&
+             (st.st_mode & 00777) != 00600 &&
+              (st.st_mode & 00777) != 00400)
         {
-            fprintf(stderr, "For security reasons the config file: %s\n"
-                            "should only be readable by the owner. You can correct the permissions by typing:\n"
-                            " chmod 600 %s\n", configfile, configfile);
+            fprintf(stderr, "The config file should only be readable by the owner.\n"
+                            "You can correct the permissions by executing:\n"
+                            " chmod 600 %s\n\n", configfile);
             exit(EXIT_FAILURE);
         }
     }
@@ -976,15 +976,7 @@ int main(int argc, char *argv[])
     config_free(&cfg);
 
     hscan_t sc;
-    hash_scan_begin(&sc, notfound_cache);
     hnode_t *n;
-    while (NULL != (n = hash_scan_next(&sc)))
-    {
-        fprintf(stderr, "%s\n", (char *)hnode_getkey(n));
-    }
-    fprintf(stderr, "Hash size:  %lu\n", (unsigned long) hash_size(notfound_cache));
-    fprintf(stderr, "Hash count: %lu\n", (unsigned long) hash_count(notfound_cache));
-
     hash_scan_begin(&sc, notfound_cache);
     while (NULL != (n = hash_scan_next(&sc)))
     {
