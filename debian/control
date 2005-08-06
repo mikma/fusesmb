@@ -1,0 +1,21 @@
+Source: fusesmb
+Section: net
+Priority: optional
+Maintainer: Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+Uploaders: Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+Build-Depends: cdbs, debhelper, libsmbclient-dev, libfuse-dev (>=2.3.0-1)
+Standards-Version: 3.6.1
+
+Package: fusesmb
+Architecture: any
+Section: net
+Depends: ${shlibs:Depends}, libfuse2 (>= 2.3.0-1)
+Recommends: samba
+Suggests: 
+Conflicts:
+Replaces:
+Provides:
+Enhances: samba
+Description: SMB for FUSE is a Samba shares filesystem. It works like 
+ smbfs, but instead of accessing one share at a time, all computers and 
+ workgroups are accessible at once from a single filesystem mount.
