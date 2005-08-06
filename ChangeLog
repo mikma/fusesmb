@@ -103,9 +103,8 @@
 2003-11-06  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
     * fusesmbcache: Removed dependency on timeout
-    * fusesmb: implemented unlink, rmdir and mkdir
-                   implemented write,
-    *          ""implemented"" chmod, truncate, chown (not used)
+    * fusesmb: implemented unlink, rmdir and mkdir, write
+               ""implemented"" chmod, truncate, chown (not used)
 
 2003-11-03  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
