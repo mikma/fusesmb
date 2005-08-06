@@ -1,33 +1,113 @@
+2005-08-06  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Fix debian dependencies, small doc fix.
+    * Debian packaging support
+
+2005-08-05  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * More man page improvements.
+    * Fix permission checking
+    * Almost ready for release! Wrote documentation. Updated version number.
+    * Fix segfault. Auth function of fusesmb.cache doesn't use locks.
+    * Fix locking for reading the config file.
+    * Check permissions of the config file
+
+2005-08-04  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Comment nmblookup parsing
+    * We don't need smbclient and python anymore
+    * Implement per server ignore setting
+    * Fix for interval <= 0, now doesn't update shares automatically. Minimum
+    * Fix order of password lookup in the config file, reuse function.
+    * Make keys and sections case-insensitive
+
+2005-07-31  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Use configfile settings in main program
+
+2005-07-30  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Fix warning
+
+2005-07-30  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Fix realloc failure because malloclines was never used
+    * Removed warning for isblank
+    * Configfile parser library.
+    * pthread.h not needed
+
+2005-07-29  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Fix bsearch and add clear method
+    * Fix removal of smbcache
+
+2005-07-29  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Implementation of network share scanning in C. Run the network scanning from
+
+2005-07-23  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Added hash for compilation
+    * Fix compile errors
+    * s/notfound_hash/notfound_cache : bit more clear.
+    * Use open flags passed by fuse_file_info in reopen phase
+    * Re-enabled write support.
+    * Get rid off __attribute__ ((unused)) in all functions
+    * Fix warning.
+    * Locking fixes. Freeing up memory of the notfound cache.
+    * Cache to limit waiting for connecting to shares.
+
+2005-07-14  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Add copyright notice
+    * Moved libsmbclient context creation to own function; renamed smb_* to
+    * Forgotten define
+    * Add stringlist implementation for share caching
+
+2005-07-13  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Some servers have NETBIOS name not equal to DNS name
+
+2005-07-12  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Fix warning for sleep
+    * Fix smb_getattr if path = '/'; fix smb_statfs
+
+2005-07-11  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+    * Connection cleanup thread
+
+
 2005-07-10  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
-	* Ported to FUSE 2.3
-	* Connection purging on closedir and close
-	* Cleanup of path conversion
+    * Ported to FUSE 2.3
+    * Connection purging on closedir and close
+    * Cleanup of path conversion
 
 2005-06-26  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
-	* Autotools improvements
-	* Cleanup of connections in release (still needs more work)
+    * Autotools improvements
+    * Cleanup of connections in release (still needs more work)
 
 2005-05-25  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
-	* Fix compilation with FUSE 2.2
-	* Fix max-read errors - libsmbclient doesn't like reads
-	  bigger than 32 kB
-	* Authentication - patch provided by Jim Ramsay
-	* Kerberos fix - patch by Esben Nielsen
+    * Fix compilation with FUSE 2.2
+    * Fix max-read errors - libsmbclient doesn't like reads
+      bigger than 32 kB
+    * Authentication - patch provided by Jim Ramsay
+    * Kerberos fix - patch by Esben Nielsen
 
 2003-11-07  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
-	* fusesmb: implemented rename
+    * fusesmb: implemented rename
 
 2003-11-06  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
-        * fusesmbcache: Removed dependency on timeout
-	* fusesmb: implemented unlink, rmdir and mkdir
-                   implemented write, 
-        *          ""implemented"" chmod, truncate, chown (not used)
+    * fusesmbcache: Removed dependency on timeout
+    * fusesmb: implemented unlink, rmdir and mkdir
+                   implemented write,
+    *          ""implemented"" chmod, truncate, chown (not used)
 
 2003-11-03  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
 
-	* fusesmb: initial version.
+    * fusesmb: initial version.
 
