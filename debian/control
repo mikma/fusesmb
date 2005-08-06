@@ -9,7 +9,7 @@ Standards-Version: 3.6.1
 Package: fusesmb
 Architecture: any
 Section: net
-Depends: ${shlibs:Depends}, libfuse2 (>= 2.3.0-1)
+Depends: libc6 (>= 2.3.2.ds1-21), libsmbclient (>=3.0.14a-1), libfuse2 (>=2.3.0-1), fuse-source (>=2.3.0-1), samba-common (>=3.0.14a-1)
 Recommends: samba
 Suggests: 
 Conflicts:
