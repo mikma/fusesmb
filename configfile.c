@@ -79,6 +79,8 @@ static int config_read_file(config_t *cf)
 
             char value_string[4096];
             char *isequal = index(stripped_string, '=');
+            if (isequal == NULL)
+                continue;
             *isequal = '\0';
             isequal++;
             char *key = strip_whitespace(stripped_string);
@@ -175,6 +177,8 @@ int config_read_string(config_t *cf, const char *section, const char *key, char 
             if (0 == strncasecmp(sl_item(cf->lines, i), cmp_key, strlen(cmp_key)))
             {
                 char *retval = index(sl_item(cf->lines, i), '=');
+                if (retval == NULL)
+                    return -1;
                 retval++;
                 if (strlen(retval))
                 {
