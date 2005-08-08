@@ -48,5 +48,6 @@ int config_read_string(config_t *cf, const char *section, const char *key, char 
 int config_read_int(config_t *cf, const char *section, const char *key, int *value);
 int config_read_bool(config_t *cf, const char *section, const char *key, int *value);
 int config_read_stringlist(config_t *cf, const char *section, const char *key, stringlist_t **value, char sep);
+int config_read_section_keys(config_t *cf, const char *section, stringlist_t **value);
 
 #endif

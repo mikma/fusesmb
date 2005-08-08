@@ -270,6 +270,53 @@ int config_read_stringlist(config_t *cf, const char *section, const char *key, s
     }
     return -1;
 }
+int config_read_section_keys(config_t *cf, const char *section, stringlist_t **value)
+{
+    size_t i;
+    char cmp_section[strlen(section)+3];
+    strcpy(cmp_section, "[");
+    strcat(cmp_section, section);
+    strcat(cmp_section, "]");
+    char section_found = 0;
+    *value = sl_init();
+    if (NULL == *value)
+        return -1;
+
+    for (i=0; i<sl_count(cf->lines); i++)
+    {
+        if (0 == strncasecmp(sl_item(cf->lines, i), cmp_section, sizeof(cmp_section))
+            && section_found == 0)
+        {
+            section_found = 1;
+            i++;
+        }
+        if (section_found == 1)
+        {
+            if (0 == strncasecmp(sl_item(cf->lines, i), "[", 1))
+            {
+                break;
+            }
+            char buf[4096];
+            strncpy(buf, sl_item(cf->lines, i), 4096);
+            char *sep = index(buf, '=');
+            if (sep == NULL)
+                continue;
+            *sep = '\0';
+            if (strlen(buf))
+            {
+                if (-1 == sl_add(*value, buf, 1))
+                    continue;
+            }
+        }
+    }
+    if (sl_count(*value) > 0)
+        return 0;
+
+    /* No keys found for this sections so freeing up the stringlist */
+    sl_free(*value);
+    *value = NULL;
+    return -1;
+}
 
 void config_free(config_t *cf)
 {
@@ -303,7 +350,7 @@ int main(void)
 {
     signal(SIGINT, int_handler);
     config_t c;
-    if (-1 == config_init(&c, "fusesmb.conf"))
+    if (-1 == config_init(&c, "fusesmb.conf.test"))
     {
         perror("config_init");
         //fprintf(stderr, "Could not open fusesmb.conf [%s]\n", strerror(errno));
@@ -361,6 +408,14 @@ int main(void)
             printf("Found TARdis: %s\n", find);
 
         sl_free(servers);
+    }
+    stringlist_t *global_keys;
+    if (0 == config_read_section_keys(&c, "global", &global_keys))
+    {
+        size_t i;
+        for (i=0; i<sl_count(global_keys); i++)
+            printf("key: %s\n", sl_item(global_keys, i));
+        sl_free(global_keys);
     }
     sleep(10);
     }
