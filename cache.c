@@ -208,10 +208,11 @@ static int server_listing(SMBCCTX *ctx, stringlist_t *cache, const char *wg, con
     if (ip != NULL)
     {
         strcat(tmp_path, ip);
-        printf("Using IP: %s\n", ip);
     }
     else
+    {
         strcat(tmp_path, sv);
+    }
 
     struct smbc_dirent *share_dirent;
     SMBCFILE *dir;
@@ -273,7 +274,7 @@ static void *workgroup_listing_thread(void *args)
     SMBCFILE *dir;
     char temp_path[MAXPATHLEN] = "smb://";
     strcat(temp_path, wg);
-
+    fprintf(stderr, "Looking up Workgroup: %s\n", wg);
     struct smbc_dirent *server_dirent;
     dir = ctx->opendir(ctx, temp_path);
     if (dir == NULL)
@@ -315,7 +316,7 @@ use_popen:
         {
             if (NULL != sl_find(opts.ignore_servers, sl_item(servers, i)))
             {
-                printf("Ignoring %s\n", sl_item(servers, i));
+                fprintf(stderr, "Ignoring %s\n", sl_item(servers, i));
                 continue;
             }
         }
@@ -402,7 +403,7 @@ int cache_servers(SMBCCTX *ctx)
         {
             if (NULL != sl_find(opts.ignore_workgroups, workgroup_dirent->name))
             {
-                printf("ignoring wg: %s\n", workgroup_dirent->name);
+                fprintf(stderr, "Ignoring Workgroup: %s\n", workgroup_dirent->name);
                 continue;
             }
         }
