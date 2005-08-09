@@ -76,6 +76,9 @@ static void fusesmb_auth_fn(const char *server, const char *share,
     (void)workgroup;
     (void)wgmaxlen;
 
+    /* Don't authenticate for workgroup listing */
+    if (NULL == server || server[0] == '\0')
+        return;
     /* Look for username, password for /SERVER/SHARE in the config file */
     char sv_section[1024] = "/";
     strcat(sv_section, server);
@@ -147,6 +150,12 @@ static void fusesmb_cache_auth_fn(const char *server, const char *share,
     (void)workgroup;
     (void)wgmaxlen;
     char sv[1024];
+
+    /* Don't authenticate for workgroup listing */
+    if (NULL == server || server[0] == '\0')
+        return;
+
+
     /* Convert ip to server name */
     nmblookup(server, sv, 1024);
     (void)workgroup;
