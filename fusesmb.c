@@ -786,11 +786,19 @@ static int fusesmb_utime(const char *path, struct utimbuf *buf)
 
 static int fusesmb_chmod(const char *path, mode_t mode)
 {
-    (void)path;
-    (void)mode;
-    /* libsmbclient has no equivalent function for this, so
-       always returning success
-     */
+    if (slashcount(path) <= 3)
+        return -EPERM;
+
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
+    strcat(smb_path, stripworkgroup(path));
+
+    pthread_mutex_lock(&ctx_mutex);
+    if (ctx->chmod(ctx, smb_path, mode) < 0)
+    {
+        pthread_mutex_unlock(&ctx_mutex);
+        return -errno;
+    }
+    pthread_mutex_unlock(&ctx_mutex);
     return 0;
 }
 static int fusesmb_chown(const char *path, uid_t uid, gid_t gid)
