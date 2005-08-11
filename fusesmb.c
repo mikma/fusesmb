@@ -559,7 +559,8 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset, 
     }
     fi->fh = (unsigned long)file;
   seek:
-    if (rwd_ctx->lseek(rwd_ctx, (SMBCFILE *)fi->fh, offset, SEEK_SET) < offset)
+
+    if (rwd_ctx->lseek(rwd_ctx, (SMBCFILE *)fi->fh, offset, SEEK_SET) == (off_t) - 1)
     {
         /* Bad file descriptor try to reopen */
         if (errno == EBADF)
@@ -625,7 +626,8 @@ static int fusesmb_write(const char *path, const char *buf, size_t size, off_t o
     }
     fi->fh = (unsigned long)file;
   seek:
-    if (rwd_ctx->lseek(rwd_ctx, (SMBCFILE *)fi->fh, offset, SEEK_SET) < offset)
+
+    if (rwd_ctx->lseek(rwd_ctx, (SMBCFILE *)fi->fh, offset, SEEK_SET) == (off_t) - 1)
     {
         /* Bad file descriptor try to reopen */
         if (errno == EBADF)
