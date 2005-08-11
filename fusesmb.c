@@ -691,6 +691,21 @@ static int fusesmb_mknod(const char *path, mode_t mode,
     }
     ctx->close(ctx, file);
     pthread_mutex_unlock(&ctx_mutex);
+    /* Clear item from notfound_cache */
+    if (slashcount(path) == 4)
+    {
+        pthread_mutex_lock(&notfound_cache_mutex);
+        hnode_t *node = hash_lookup(notfound_cache, path);
+        if (node != NULL)
+        {
+            const void *key = hnode_getkey(node);
+            void *data = hnode_get(node);
+            hash_delete_free(notfound_cache, node);
+            free((void *)key);
+            free(data);
+        }
+        pthread_mutex_unlock(&notfound_cache_mutex);
+    }
     return 0;
 }
 
@@ -792,13 +807,31 @@ static int fusesmb_chown(const char *path, uid_t uid, gid_t gid)
 static int fusesmb_truncate(const char *path, off_t size)
 {
 
-    (void)path;
-    (void)size;
+    //(void)path;
+    //(void)size;
     /* FIXME libsmbclient has no equivalent function for this, so
        always returning succes, but it should only return success
        for a few cases
      */
-    return 0;
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
+    if (slashcount(path) <= 2)
+        return -EACCES;
+
+    SMBCFILE *file;
+    strcat(smb_path, stripworkgroup(path));
+    if (size == 0)
+    {
+        pthread_mutex_lock(&ctx_mutex);
+        if (NULL == (file = ctx->creat(ctx, smb_path, 0777)))
+        {
+            pthread_mutex_unlock(&ctx_mutex);
+            return -errno;
+        }
+        ctx->close(ctx, file);
+        pthread_mutex_unlock(&ctx_mutex);
+        return 0;
+    }
+    return -ENOTSUP;
 }
 
 static int fusesmb_rename(const char *path, const char *new_path)

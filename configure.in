@@ -11,7 +11,15 @@ AC_SUBST(VERSION)
 AC_DEFINE(_FILE_OFFSET_BITS,64,[Use 64 bits file offsets])
 AC_DEFINE(FUSE_USE_VERSION,23,[Fuse API Version])
 
-CFLAGS="-Wall -W -g -O2"
+AC_ARG_WITH(debug,AC_HELP_STRING([--with-debug],
+                                  [Turn debugging options on]),
+            DEBUG=yes, DEBUG=no)
+
+if [[ "x$DEBUG" = "xyes" ]]; then
+  CFLAGS="$CFLAGS -Wall -W -g -O0"
+else
+  CFLAGS="$CFLAGS -Wall -W -g -O2"
+fi
 
 ISODATE=`date +%Y-%m-%d`
 AC_SUBST(ISODATE)
