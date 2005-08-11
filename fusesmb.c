@@ -824,7 +824,7 @@ static int fusesmb_truncate(const char *path, off_t size)
        for a few cases
      */
     char smb_path[MY_MAXPATHLEN] = "smb:/";
-    if (slashcount(path) <= 2)
+    if (slashcount(path) <= 3)
         return -EACCES;
 
     SMBCFILE *file;
