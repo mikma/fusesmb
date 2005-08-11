@@ -830,7 +830,7 @@ static int fusesmb_truncate(const char *path, off_t size)
     if (size == 0)
     {
         pthread_mutex_lock(&ctx_mutex);
-        if (NULL == (file = ctx->creat(ctx, smb_path, 0777)))
+        if (NULL == (file = ctx->creat(ctx, smb_path, 0666)))
         {
             pthread_mutex_unlock(&ctx_mutex);
             return -errno;
