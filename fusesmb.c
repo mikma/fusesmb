@@ -381,7 +381,7 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
        /WORKGROUP and
        /WORKGROUP/COMPUTER
      */
-
+    last_dir_entry[0] = '\0';
     if (slashcount(path) <= 2)
     {
         /* Listing Workgroups */
@@ -404,7 +404,6 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                     if (strlen(path) > 1)
                     {
                         dir_entry = strtok(&buf[strlen(path) + 1], "/");
-
                         /* Look if share is a hidden share, dir_entry still contains '\n' */
                         if (slashcount(path) == 2)
                         {
@@ -817,12 +816,7 @@ static int fusesmb_chown(const char *path, uid_t uid, gid_t gid)
 static int fusesmb_truncate(const char *path, off_t size)
 {
 
-    //(void)path;
-    //(void)size;
-    /* FIXME libsmbclient has no equivalent function for this, so
-       always returning succes, but it should only return success
-       for a few cases
-     */
+    //fprintf(stderr, "TRUNCATE %s [%llu]\n", path, size);
     char smb_path[MY_MAXPATHLEN] = "smb:/";
     if (slashcount(path) <= 3)
         return -EACCES;
