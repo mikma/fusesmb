@@ -1,3 +1,4 @@
+AM_CPPFLAGS=-D_REENTRANT -D_FILE_OFFSET_BITS=64
 bin_PROGRAMS=fusesmb fusesmb.cache
 fusesmb_SOURCES=fusesmb.c hash.c smbctx.c stringlist.c configfile.c
 fusesmb_cache_SOURCES = cache.c hash.c stringlist.c smbctx.c configfile.c

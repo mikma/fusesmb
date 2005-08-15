@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <libsmbclient.h>
 #include <time.h>
+#include "debug.h"
 #include "hash.h"
 #include "smbctx.h"
 
@@ -135,7 +136,7 @@ static void *smb_purge_thread(void *data)
                 if (time(NULL) - data->ctime > 15 * 60) /* 15 minutes */
                 {
                     const void *key = hnode_getkey(n);
-                    fprintf(stderr, "Deleting notfound node: %s\n", (char *)key);
+                    debug("Deleting notfound node: %s", (char *)key);
                     hash_scan_delfree(notfound_cache, n);
                     free((void *)key);
                     free(data);
@@ -295,7 +296,7 @@ static int fusesmb_getattr(const char *path, struct stat *stbuf)
             hnode_t *node = hash_lookup(notfound_cache, path);
             if (node)
             {
-                fprintf(stderr, "NotFoundCache hit for: %s\n", path);
+                debug("NotFoundCache hit for: %s", path);
                 notfound_node_t *data = hnode_get(node);
                 int err = data->err;
                 data->ctime = time(NULL);
@@ -366,7 +367,7 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
     (void)offset;
     struct smbc_dirent *pdirent;
     char buf[MY_MAXPATHLEN],
-         last_dir_entry[MY_MAXPATHLEN],
+         last_dir_entry[MY_MAXPATHLEN] = "",
          cache_file[1024];
     FILE *fp;
     char *dir_entry;
@@ -381,7 +382,6 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
        /WORKGROUP and
        /WORKGROUP/COMPUTER
      */
-    last_dir_entry[0] = '\0';
     if (slashcount(path) <= 2)
     {
         /* Listing Workgroups */
@@ -861,7 +861,7 @@ static int fusesmb_rename(const char *path, const char *new_path)
 
 static void *fusesmb_init()
 {
-    fprintf(stderr, "fusesmb_init\n");
+    debug();
     if (0 != pthread_create(&cleanup_thread, NULL, smb_purge_thread, NULL))
         exit(EXIT_FAILURE);
     return NULL;

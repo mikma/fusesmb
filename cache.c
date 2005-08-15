@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include <libsmbclient.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -14,6 +18,7 @@
 #include "smbctx.h"
 #include "hash.h"
 #include "configfile.h"
+#include "debug.h"
 
 #define MAX_SERVERLEN 255
 #define MAX_WGLEN 255
@@ -26,6 +31,7 @@ struct fusesmb_cache_opt {
     stringlist_t *ignore_servers;
     stringlist_t *ignore_workgroups;
 };
+
 
 config_t cfg;
 struct fusesmb_cache_opt opts;
@@ -126,7 +132,7 @@ static int nmblookup(const char *wg, stringlist_t *sl, hash_t *ipcache)
         free(ip_cmd);
         return 0;
     }
-    fprintf(stderr, "%s\n", ip_cmd);
+    debug("%s\n", ip_cmd);
     pipe = popen(ip_cmd, "r");
     if (pipe == NULL)
     {
@@ -160,7 +166,7 @@ static int nmblookup(const char *wg, stringlist_t *sl, hash_t *ipcache)
             char *end = index(tmp, '\n');
             *end = '\0';
             strcpy(ip, tmp);
-            printf("%s\n", ip);
+            debug("%s", ip);
         }
         else
         {
@@ -192,7 +198,7 @@ static int nmblookup(const char *wg, stringlist_t *sl, hash_t *ipcache)
             sl_add(sl, start, 1);
             if (NULL == hash_lookup(ipcache, start))
                 hash_alloc_insert(ipcache, strdup(start), strdup(ip));
-            printf("%s : %s\n", ip, start);
+            debug("%s : %s", ip, start);
         }
 
     }
@@ -237,7 +243,7 @@ static int server_listing(SMBCCTX *ctx, stringlist_t *cache, const char *wg, con
         int len = strlen(wg)+ strlen(sv) + strlen(share_dirent->name) + 4;
         char tmp[len];
         snprintf(tmp, len, "/%s/%s/%s", wg, sv, share_dirent->name);
-        printf("%s\n", tmp);
+        debug("%s", tmp);
         pthread_mutex_lock(&cache_mutex);
         if (-1 == sl_add(cache, tmp, 1))
         {
@@ -274,7 +280,7 @@ static void *workgroup_listing_thread(void *args)
     SMBCFILE *dir;
     char temp_path[MAXPATHLEN] = "smb://";
     strcat(temp_path, wg);
-    fprintf(stderr, "Looking up Workgroup: %s\n", wg);
+    debug("Looking up Workgroup: %s", wg);
     struct smbc_dirent *server_dirent;
     dir = ctx->opendir(ctx, temp_path);
     if (dir == NULL)
@@ -316,7 +322,7 @@ use_popen:
         {
             if (NULL != sl_find(opts.ignore_servers, sl_item(servers, i)))
             {
-                fprintf(stderr, "Ignoring %s\n", sl_item(servers, i));
+                debug("Ignoring %s", sl_item(servers, i));
                 continue;
             }
         }
@@ -403,7 +409,7 @@ int cache_servers(SMBCCTX *ctx)
         {
             if (NULL != sl_find(opts.ignore_workgroups, workgroup_dirent->name))
             {
-                fprintf(stderr, "Ignoring Workgroup: %s\n", workgroup_dirent->name);
+                debug("Ignoring Workgroup: %s", workgroup_dirent->name);
                 continue;
             }
         }
