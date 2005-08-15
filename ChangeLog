@@ -1,112 +1,157 @@
-2005-08-06  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-15 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Fix debian dependencies, small doc fix.
-    * Debian packaging support
+	* debug.h: Only use debugging if gcc is used
+	* Makefile.am, cache.c, configure.in, debug.h, fusesmb.c: Add debug macro
+	  instead of printf. Add --enable-debug to configure. Use
+	  debug macro.
 
-2005-08-05  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-12 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * More man page improvements.
-    * Fix permission checking
-    * Almost ready for release! Wrote documentation. Updated version number.
-    * Fix segfault. Auth function of fusesmb.cache doesn't use locks.
-    * Fix locking for reading the config file.
-    * Check permissions of the config file
+	* fusesmb.c: Fix uninitialized last_dir_entry
+	* fusesmb.conf.ex: Sample configuration file
 
-2005-08-04  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-11 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Comment nmblookup parsing
-    * We don't need smbclient and python anymore
-    * Implement per server ignore setting
-    * Fix for interval <= 0, now doesn't update shares automatically. Minimum
-    * Fix order of password lookup in the config file, reuse function.
-    * Make keys and sections case-insensitive
+	* fusesmb.c: Cannot change shares as well
+	* fusesmb.c: ctx->lseek returns off_t - 1 on error
+	* fusesmb.c: File creation with 0666 instead of 0777
+	* fusesmb.c: chmod support
+	* configure.in, fusesmb.c: Truncate improvements. Delete file from
+	  notfound_cache when file is created
+	  with mknod.
 
-2005-07-31  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-09 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Use configfile settings in main program
+	* cache.c, smbctx.c: Clean debug output
+	* smbctx.c: Don't provide username for workgroup listing
 
-2005-07-30  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-08 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Fix warning
+	* configfile.c, configfile.h: Added config_read_section_keys function
+	* configfile.c: Fix crash when a line doesn't contain a '='
+	* .hgtags: Added tag v0.8.0 for changeset
+	  fb9c54ddd205a14dc4ce64762b3cc7c98f6e13b9
 
-2005-07-30  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-06 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Fix realloc failure because malloclines was never used
-    * Removed warning for isblank
-    * Configfile parser library.
-    * pthread.h not needed
+	* Makefile.am: Add debian dir to distribution
+	* ChangeLog: Small changelog fix
+	* ChangeLog: Updated changelog (generated from Mercurial)
+	* debian/control, fusesmb.1: Fix debian dependencies, small doc fix.
+	* debian/changelog, debian/compat, debian/control, debian/rules: Debian
+	  packaging support
 
-2005-07-29  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-05 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Fix bsearch and add clear method
-    * Fix removal of smbcache
+	* fusesmb.1, fusesmb.conf.5: More man page improvements.
+	* fusesmb.c: Fix permission checking
+	* INSTALL, Makefile.am, configure.in, fusesmb.1, fusesmb.conf.5: Almost
+	  ready for release! Wrote documentation. Updated version number.
 
-2005-07-29  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-08-04 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Implementation of network share scanning in C. Run the network scanning from
+	* smbctx.c: Fix segfault. Auth function of fusesmb.cache doesn't use
+	  locks.
+	* fusesmb.c: Fix locking for reading the config file. Check permissions of
+	  the config
+	  file on startup.
+	* cache.c: Comment nmblookup parsing
+	* cache.c, configure.in: We don't need smbclient and python anymore
+	* cache.c: Implement per server ignore setting
+	* fusesmb.c: Fix for interval <= 0, now doesn't update shares
+	  automatically. Minimum
+	  timeout for libsmbclient set to 2 seconds. Fix conversion to
+	  milliseconds.
+	  Add per server showhiddenshares option.
+	* smbctx.c: Fix order of password lookup in the config file, reuse
+	  function.
+	* configfile.c: Make keys and sections case-insensitive
 
-2005-07-23  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-07-31 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Added hash for compilation
-    * Fix compile errors
-    * s/notfound_hash/notfound_cache : bit more clear.
-    * Use open flags passed by fuse_file_info in reopen phase
-    * Re-enabled write support.
-    * Get rid off __attribute__ ((unused)) in all functions
-    * Fix warning.
-    * Locking fixes. Freeing up memory of the notfound cache.
-    * Cache to limit waiting for connecting to shares.
+	* Makefile.am, cache.c, configfile.c, configfile.h, fusesmb.c, smbctx.c,
+	  smbctx.h: Use configfile settings in main program
 
-2005-07-14  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-07-30 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Add copyright notice
-    * Moved libsmbclient context creation to own function; renamed smb_* to
-    * Forgotten define
-    * Add stringlist implementation for share caching
+	* configfile.c: Fix warning
+	* stringlist.c, stringlist.h: Fix realloc failure because malloclines was
+	  never used
 
-2005-07-13  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-07-29 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Some servers have NETBIOS name not equal to DNS name
+	* configfile.c: Removed warning for isblank
+	* configfile.c, configfile.h: Configfile parser library.
+	* stringlist.h: pthread.h not needed
+	* stringlist.c, stringlist.h: Fix bsearch and add clear method
+	* Makefile.am: Fix removal of smbcache
+	* Makefile.am, cache.c, fusesmb.c, smbctx.c, smbctx.h, stringlist.c,
+	  stringlist.h: Implementation of network share scanning in C. Run the
+	  network scanning from
+	  the fusesmb program (no more cron-job needed). Moved SMBCCTX creation to
+	  separate file.
 
-2005-07-12  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-07-23 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Fix warning for sleep
-    * Fix smb_getattr if path = '/'; fix smb_statfs
+	* Makefile.am: Added hash for compilation
+	* fusesmb.c: Fix compile errors
+	* fusesmb.c: s/notfound_hash/notfound_cache : bit more clear.
+	* fusesmb.c: Use open flags passed by fuse_file_info in reopen phase
+	* fusesmb.c: Re-enabled write support.
+	* fusesmb.c: Forgot this one.
 
-2005-07-11  Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+2005-07-22 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Connection cleanup thread
+	* fusesmb.c: Get rid off __attribute__ ((unused)) in all functions
+	* hash.c: Fix warning.
+	* fusesmb.c: Locking fixes. Freeing up memory of the notfound cache.
+	* fusesmb.c, hash.c, hash.h: Cache to limit waiting for connecting to
+	  shares.
 
+2005-07-14 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-2005-07-10  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
-    * Ported to FUSE 2.3
-    * Connection purging on closedir and close
-    * Cleanup of path conversion
+	* stringlist.c, stringlist.h: Add copyright notice
+	* fusesmb.c: Moved libsmbclient context creation to own function; renamed
+	  smb_* to
+	  fusesmb_*
+	* stringlist.h: Forgotten define
+	* stringlist.c, stringlist.h: Add stringlist implementation for share
+	  caching
 
-2005-06-26  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
+2005-07-12 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Autotools improvements
-    * Cleanup of connections in release (still needs more work)
+	* fusesmbcache: Some servers have NETBIOS name not equal to DNS name
 
-2005-05-25  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
+2005-07-11 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * Fix compilation with FUSE 2.2
-    * Fix max-read errors - libsmbclient doesn't like reads
-      bigger than 32 kB
-    * Authentication - patch provided by Jim Ramsay
-    * Kerberos fix - patch by Esben Nielsen
+	* fusesmb.c: Fix warning for sleep
+	* fusesmb.c: Fix smb_getattr if path = '/'; fix smb_statfs
+	* fusesmb.c: Connection cleanup thread
+	  Workgroup/Server/Share mtime/atime/ctime dependent on cache file
 
-2003-11-07  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
+2005-07-10 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * fusesmb: implemented rename
+	* Makefile.repos: Fix newline
+	* Makefile.repos, fusesmb.lsm.in, fusesmb.spec.in: Make mercurial pulls
+	  work
+	* ChangeLog, fusesmb.c: Locking fix in opendir, cleanup of path
+	  conversions
 
-2003-11-06  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
+2005-07-09 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * fusesmbcache: Removed dependency on timeout
-    * fusesmb: implemented unlink, rmdir and mkdir, write
-               ""implemented"" chmod, truncate, chown (not used)
+	* configure.in, fusesmb.c: Updated to work with FUSE 2.3 (still needs some
+	  cleanup, but works for now)
 
-2003-11-03  Vincent Wagelaar  <vincent@ricardis.tudelft.nl>
+2005-07-03 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
-    * fusesmb: initial version.
+	* fusesmb.c: Clean indentation
 
+2005-06-27 vincent@hannibal.ricardis.local
+
+	* ChangeLog, Makefile.am, configure.in, fusesmb.c: Autotools improvements,
+	  disconnect from servers.
+
+2005-06-26 vincent@hannibal.ricardis.local
+
+	* AUTHORS, COPYING, ChangeLog, INSTALL, Makefile.am, NEWS, README,
+	  configure.in, fusesmb.1, fusesmb.c, fusesmbcache: Initial commit
