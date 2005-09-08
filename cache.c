@@ -452,7 +452,10 @@ int cache_servers(SMBCCTX *ctx)
     char tmp_cachefile[1024] = "/tmp/fusesmb.cache.XXXXX";
     mkstemp(tmp_cachefile);
     snprintf(cachefile, 1024, "%s/.smb/fusesmb.cache", getenv("HOME"));
+    mode_t oldmask;
+    oldmask = umask(022);
     FILE *fp = fopen(cachefile, "w");
+    umask(oldmask);
     if (fp == NULL)
     {
         sl_free(cache);
@@ -512,9 +515,11 @@ int main(int argc, char *argv[])
         }
         if (chdir("/") < 0)
             exit(EXIT_FAILURE);
-        umask(0);
 
+        mode_t oldmask;
+        oldmask = umask(077);
         FILE *fp = fopen(pidfile, "w");
+        umask(oldmask);
         if (NULL == fp)
             exit(EXIT_FAILURE);
         fprintf(fp, "%i\n", sid);
