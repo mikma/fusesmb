@@ -13,6 +13,9 @@ To compile type:
 (enter root password)
  # make install
 
+In case you define a custom install path, make sure that the path to the
+installed executables - fusesmb and fusesmb.cache - are in your $PATH .
+
 Running
 -------------------------------------------------------------------------------
 To run SMB for FUSE type - as normal user:
@@ -30,6 +33,7 @@ Configuration
 If you need authentication you can edit the file ~/.smb/fusesmb.conf . An
 example of this file with comments for every available option is shown in
 fusesmb.conf.ex .
+
 
 Note for users of previous versions
 -------------------------------------------------------------------------------

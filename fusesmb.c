@@ -70,6 +70,7 @@ config_t cfg;
 pthread_mutex_t cfg_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct fusesmb_opt opts;
 pthread_mutex_t opts_mutex = PTHREAD_MUTEX_INITIALIZER;
+char fusesmb_cache_bin[MAXPATHLEN];
 
 static void options_read(config_t *cfg, struct fusesmb_opt *opt)
 {
@@ -162,7 +163,7 @@ static void *smb_purge_thread(void *data)
             {
                 if (errno == ENOENT)
                 {
-                    system("fusesmb.cache");
+                    system(fusesmb_cache_bin);
                 }
             }
             else if (time(NULL) - st.st_mtime > opts.global_interval * 60)
@@ -662,7 +663,11 @@ static int fusesmb_release(const char *path, struct fuse_file_info *fi)
 {
     (void)path;
     pthread_mutex_lock(&rwd_ctx_mutex);
+#ifdef HAVE_LIBSMBCLIENT_CLOSE_FN
+    rwd_ctx->close_fn(rwd_ctx, (SMBCFILE *)fi->fh);
+#else
     rwd_ctx->close(rwd_ctx, (SMBCFILE *)fi->fh);
+#endif
     pthread_mutex_unlock(&rwd_ctx_mutex);
     return 0;
 
@@ -690,7 +695,12 @@ static int fusesmb_mknod(const char *path, mode_t mode,
         pthread_mutex_unlock(&ctx_mutex);
         return -errno;
     }
+#ifdef HAVE_LIBSMBCLIENT_CLOSE_FN
+    ctx->close_fn(ctx, file);
+#else
     ctx->close(ctx, file);
+#endif
+
     pthread_mutex_unlock(&ctx_mutex);
     /* Clear item from notfound_cache */
     if (slashcount(path) == 4)
@@ -831,7 +841,11 @@ static int fusesmb_truncate(const char *path, off_t size)
             pthread_mutex_unlock(&ctx_mutex);
             return -errno;
         }
+#ifdef HAVE_LIBSMBCLIENT_CLOSE_FN
+        ctx->close_fn(ctx, file);
+#else
         ctx->close(ctx, file);
+#endif
         pthread_mutex_unlock(&ctx_mutex);
         return 0;
     }
@@ -970,6 +984,29 @@ int main(int argc, char *argv[])
                             " chmod 600 %s\n\n", configfile);
             exit(EXIT_FAILURE);
         }
+    }
+    /* Check if fusesmb.cache can be found
+       we're looking in FUSESMB_CACHE_BINDIR, $PATH or in cwd */
+    if (-1 == stat(FUSESMB_CACHE_BINDIR"/fusesmb.cache", &st))
+    {
+        if (-1 == stat("fusesmb.cache", &st))
+        {
+            fprintf(stderr, "Could not find the required file fusesmb.cache.\n"
+                            "This file should either be in:\n"
+                            " - "FUSESMB_CACHE_BINDIR"\n"
+                            " - $PATH\n"
+                            " - your current working directory\n"
+                            "(%s)\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        else
+        {
+            strncpy(fusesmb_cache_bin, "fusesmb.cache", MAXPATHLEN-1);
+        }
+    }
+    else
+    {
+        strncpy(fusesmb_cache_bin, FUSESMB_CACHE_BINDIR"fusesmb.cache", MAXPATHLEN-1);
     }
 
     if (-1 == config_init(&cfg, configfile))
