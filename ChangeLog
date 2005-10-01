@@ -1,5 +1,20 @@
+2005-10-01 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+	* fusesmb.c: Forgot a slash
+	* INSTALL, configure.in, fusesmb.c: Compatibility with libsmbclient 3.0.20
+	  (close() -> close_fn())
+	  Make sure we can find fusesmb.cache
+
+2005-09-08 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
+
+	* cache.c: Create pid file and cache file with correct permissions
+
 2005-08-15 Vincent Wagelaar <vincent@ricardis.tudelft.nl>
 
+	* .hgtags: Added tag v0.8.1 for changeset
+	  662a26ec3e5056e8659ef344fc21920027f6595d
+	* ChangeLog, Makefile.am, configure.in: Add debug to distribution. New
+	  version number. Update changelog.
 	* debug.h: Only use debugging if gcc is used
 	* Makefile.am, cache.c, configure.in, debug.h, fusesmb.c: Add debug macro
 	  instead of printf. Add --enable-debug to configure. Use
