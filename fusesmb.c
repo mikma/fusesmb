@@ -1006,7 +1006,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        strncpy(fusesmb_cache_bin, FUSESMB_CACHE_BINDIR"fusesmb.cache", MAXPATHLEN-1);
+        strncpy(fusesmb_cache_bin, FUSESMB_CACHE_BINDIR"/fusesmb.cache", MAXPATHLEN-1);
     }
 
     if (-1 == config_init(&cfg, configfile))
