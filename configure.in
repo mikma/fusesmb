@@ -62,13 +62,11 @@ AC_CACHE_CHECK([whether libsmbclient has close or close_fn],
                [ac_cv_libsmbclient_has_close_fn],
                [AC_TRY_COMPILE([
 #include <libsmbclient.h>
-
+               ],[
 SMBCCTX *ctx;
 SMBCFILE *file;
-int main(void) {
 ctx->close_fn(ctx, file);
-return 0;
-}              ],,
+               ],
                ac_cv_libsmbclient_has_close_fn=yes,
                ac_cv_libsmbclient_has_close_fn=no)])
 
