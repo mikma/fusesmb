@@ -461,7 +461,6 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
     else
     {
         pthread_mutex_lock(&ctx_mutex);
-
         while (NULL != (pdirent = ctx->readdir(ctx, (SMBCFILE *)fi->fh)))
         {
             if (pdirent->smbc_type == SMBC_DIR)
@@ -473,6 +472,24 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
             {
                 st.st_mode = DT_REG << 12;
                 filler(h, pdirent->name, &st, 0);
+            }
+            if (slashcount(path) == 4 && 
+                (pdirent->smbc_type == SMBC_FILE || pdirent->smbc_type == SMBC_DIR))
+            {
+                /* Clear item from notfound_cache */
+		pthread_mutex_lock(&notfound_cache_mutex);
+                char full_entry_path[MY_MAXPATHLEN];
+                sprintf(full_entry_path, "%s/%s", path, entry_name);
+                hnode_t *node = hash_lookup(notfound_cache, full_entry_path);
+                if (node != NULL)
+                {
+                    void *data = hnode_get(node);
+                    const void *key = hnode_getkey(node);
+                    hash_delete_free(notfound_cache, node);
+                    free((void *)key);
+                    free(data);
+                }
+                pthread_mutex_unlock(&notfound_cache_mutex);
             }
         }
         pthread_mutex_unlock(&ctx_mutex);
@@ -782,6 +799,22 @@ static int fusesmb_mkdir(const char *path, mode_t mode)
         return -errno;
     }
     pthread_mutex_unlock(&ctx_mutex);
+    
+    /* Clear item from notfound_cache */
+    if (slashcount(path) == 4)
+    {
+        pthread_mutex_lock(&notfound_cache_mutex);
+	hnode_t *node = hash_lookup(notfound_cache, path);
+	if (node != NULL)
+	{
+	    void *data = hnode_get(node);
+	    const void *key = hnode_getkey(node);
+	    hash_delete_free(notfound_cache, node);
+	    free((void *)key);
+	    free(data);
+	}
+	pthread_mutex_unlock(&notfound_cache_mutex);
+    }
     return 0;
 }
 
