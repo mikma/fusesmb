@@ -206,9 +206,9 @@ static void *smb_purge_thread(void *data)
 
 static const char *stripworkgroup(const char *file)
 {
-    unsigned int i = 0, ret = 0, goodpos = 0;
+    unsigned int i = 0, ret = 0, goodpos = 0, file_len = strlen(file);
 
-    for (i = 0; i < strlen(file); i++)
+    for (i = 0; i < file_len; i++)
     {
         if (ret == 2)
         {
@@ -227,9 +227,9 @@ static const char *stripworkgroup(const char *file)
 
 static unsigned int slashcount(const char *file)
 {
-    unsigned int i = 0, count = 0;
+    unsigned int i = 0, count = 0, file_len = strlen(file);
 
-    for (i = 0; i < strlen(file); i++)
+    for (i = 0; i < file_len; i++)
     {
         if (file[i] == '/')
             count++;
@@ -479,7 +479,7 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
                 /* Clear item from notfound_cache */
 		pthread_mutex_lock(&notfound_cache_mutex);
                 char full_entry_path[MY_MAXPATHLEN];
-                sprintf(full_entry_path, "%s/%s", path, entry_name);
+                snprintf(full_entry_path, sizeof(full_entry_path)-1, "%s/%s", path, pdirent->name);
                 hnode_t *node = hash_lookup(notfound_cache, full_entry_path);
                 if (node != NULL)
                 {
