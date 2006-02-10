@@ -9,7 +9,7 @@ AM_CONFIG_HEADER(config.h)
 
 AC_SUBST(VERSION)
 AC_DEFINE(_FILE_OFFSET_BITS,64,[Use 64 bits file offsets])
-AC_DEFINE(FUSE_USE_VERSION,23,[Fuse API Version])
+AC_DEFINE(FUSE_USE_VERSION,22,[Fuse API Version])
 
 
 # $prefix stores the value of the --prefix command line option, or
