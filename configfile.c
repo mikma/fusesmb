@@ -168,7 +168,8 @@ int config_read_string(config_t *cf, const char *section, const char *key, char 
             section_found = 1;
             i++;
         }
-        if (section_found == 1)
+        /* Check if we're not over the last line */
+        if (section_found == 1 && i < sl_count(cf->lines))
         {
             if (0 == strncasecmp(sl_item(cf->lines, i), "[", 1))
             {
@@ -356,6 +357,7 @@ int main(void)
         //fprintf(stderr, "Could not open fusesmb.conf [%s]\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
+    config_show_parsed(&c);
     while(keeprunning){
     char *user, *pass;
     stringlist_t *workgroups, *servers;
@@ -386,6 +388,7 @@ int main(void)
         printf("Found showhiddenshares: %i\n", showhiddenshares);
     else
         printf("Could not find showhiddenshares\n");
+
     if (0 == config_read_stringlist(&c, "ignore", "workgroups", &workgroups, ','))
     {
         size_t i;
@@ -393,6 +396,10 @@ int main(void)
         for (i=0; i<sl_count(workgroups); i++)
             printf(" %s\n", sl_item(workgroups, i));
         sl_free(workgroups);
+    }
+    else
+    {
+        printf("Could not find ignore workgroups\n");
     }
     if (0 == config_read_stringlist(&c, "ignore", "servers", &servers, ','))
     {
@@ -408,6 +415,10 @@ int main(void)
             printf("Found TARdis: %s\n", find);
 
         sl_free(servers);
+    }
+    else
+    {
+        printf("Could not find ignore servers\n");
     }
     stringlist_t *global_keys;
     if (0 == config_read_section_keys(&c, "global", &global_keys))
