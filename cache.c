@@ -449,7 +449,8 @@ int cache_servers(SMBCCTX *ctx)
 
     sl_casesort(cache);
     char cachefile[1024];
-    char tmp_cachefile[1024] = "/tmp/fusesmb.cache.XXXXX";
+    char tmp_cachefile[1024];
+    snprintf(tmp_cachefile, 1024, "%s/.smb/fusesmb.cache.XXXXX", getenv("HOME"));
     mkstemp(tmp_cachefile);
     snprintf(cachefile, 1024, "%s/.smb/fusesmb.cache", getenv("HOME"));
     mode_t oldmask;
