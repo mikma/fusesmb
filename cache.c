@@ -455,7 +455,7 @@ int cache_servers(SMBCCTX *ctx)
     snprintf(cachefile, 1024, "%s/.smb/fusesmb.cache", getenv("HOME"));
     mode_t oldmask;
     oldmask = umask(022);
-    FILE *fp = fopen(cachefile, "w");
+    FILE *fp = fopen(tmp_cachefile, "w");
     umask(oldmask);
     if (fp == NULL)
     {
