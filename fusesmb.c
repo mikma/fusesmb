@@ -872,7 +872,7 @@ static int fusesmb_chown(const char *path, uid_t uid, gid_t gid)
 static int fusesmb_truncate(const char *path, off_t size)
 {
 
-    //fprintf(stderr, "TRUNCATE %s [%llu]\n", path, size);
+    debug("path: %s, size: %lld", path, size);
     char smb_path[MY_MAXPATHLEN] = "smb:/";
     if (slashcount(path) <= 3)
         return -EACCES;
@@ -894,6 +894,24 @@ static int fusesmb_truncate(const char *path, off_t size)
 #endif
         pthread_mutex_unlock(&ctx_mutex);
         return 0;
+    }
+    else
+    {
+         /* If the truncate size is equal to the current file size, the file
+            is also correctly truncated (fixes an error from OpenOffice)
+            */
+         pthread_mutex_lock(&ctx_mutex);
+         struct stat st;
+         if (ctx->stat(ctx, smb_path, &st) < 0)
+         {
+             pthread_mutex_unlock(&ctx_mutex);
+             return -errno;
+         }
+         pthread_mutex_unlock(&ctx_mutex);
+         if (size == st.st_size)
+         {
+             return 0;
+         }
     }
     return -ENOTSUP;
 }
