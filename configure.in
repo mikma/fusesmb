@@ -2,7 +2,7 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT(fusesmb.c)
 dnl Every other copy of the package version number gets its value from here
-AM_INIT_AUTOMAKE(fusesmb, 0.8.3)
+AM_INIT_AUTOMAKE(fusesmb, 0.8.7)
 
 dnl create a config.h file (Automake will add -DHAVE_CONFIG_H)
 AM_CONFIG_HEADER(config.h)
@@ -25,17 +25,21 @@ if test "x$exec_prefix" = "xNONE"; then
 fi
 
 
-FUSESMB_CACHE_BINDIR=`eval echo $bindir`
-AC_SUBST(FUSESMB_CACHE_BINDIR)
-AC_DEFINE_UNQUOTED(FUSESMB_CACHE_BINDIR,"$FUSESMB_CACHE_BINDIR")
-AC_DEFINE([FUSESMB_CACHE_BINDIR], [], [Path to fusesmb.cache])
+dnl FUSESMB_CACHE_BINDIR=`eval echo $bindir`
+dnl AC_SUBST(FUSESMB_CACHE_BINDIR)
+AS_AC_EXPAND(SYSCONFDIR, $sysconfdir)
+AC_MSG_NOTICE(Storing data files in $SYSCONFDIR)
+AS_AC_EXPAND(BINDIR, $bindir)
+AC_DEFINE_UNQUOTED(FUSESMB_SYSCONFDIR, $SYSCONFDIR, [System configuration path])
+AC_DEFINE_UNQUOTED(FUSESMB_CACHE_BINDIR, "$BINDIR", [Path to fusesmb.cache])
+dnl AC_DEFINE([FUSESMB_CACHE_BINDIR], [], [Path to fusesmb.cache])
 
 AC_ARG_ENABLE(debug,AC_HELP_STRING([--enable-debug],
                                   [Turn debugging options on]),
             [])
 
 if [[ "x$enable_debug" = "xyes" ]]; then
-  CFLAGS="$CFLAGS -Wall -W -g -O0"
+  CFLAGS="$CFLAGS -Wall -W -g "
 else
   CFLAGS="$CFLAGS -Wall -W -g -O2"
 fi
