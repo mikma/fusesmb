@@ -833,11 +833,28 @@ static int fusesmb_mkdir(const char *path, mode_t mode)
 
 static int fusesmb_utime(const char *path, struct utimbuf *buf)
 {
-    (void)path;
-    (void)buf;
-    /* libsmbclient has no equivalent function for this, so
-       always returning success
-     */
+    struct timeval tbuf[2];
+    debug("path: %s, atime: %ld, mtime: %ld", path, buf->actime, buf->modtime);
+
+    char smb_path[MY_MAXPATHLEN] = "smb:/";
+    if (slashcount(path) <= 3)
+        return -EACCES;
+
+    strcat(smb_path, stripworkgroup(path));
+    tbuf[0].tv_sec = buf->actime;
+    tbuf[0].tv_usec = 0;
+    tbuf[1].tv_sec = buf->modtime;
+    tbuf[1].tv_usec = 0;
+
+    pthread_mutex_lock(&ctx_mutex);
+    if (ctx->utimes(ctx, smb_path, tbuf) < 0)
+    {
+        pthread_mutex_unlock(&ctx_mutex);
+        return -errno;
+    }
+    pthread_mutex_unlock(&ctx_mutex);
+
+
     return 0;
 }
 
@@ -995,7 +1012,6 @@ int main(int argc, char *argv[])
     int my_argc = 0, i = 0;
 
     /* Check if the directory for smbcache exists and if not so create it */
-
     char cache_path[1024];
     snprintf(cache_path, 1024, "%s/.smb/", getenv("HOME"));
     struct stat st;
