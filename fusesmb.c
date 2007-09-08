@@ -628,6 +628,7 @@ static int fusesmb_write(const char *path, const char *buf, size_t size, off_t o
     char smb_path[MY_MAXPATHLEN] = "smb:/";
 
     strcat(smb_path, stripworkgroup(path));
+    debug("%s: size: %zd; offset: %lld", path, size, offset);
 
     int tries = 0;              //For number of retries before failing
     ssize_t ssize;              //Returned by ctx->read
