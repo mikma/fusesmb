@@ -474,6 +474,11 @@ static int fusesmb_readdir(const char *path, void *h, fuse_fill_dir_t filler,
     else
     {
         pthread_mutex_lock(&ctx_mutex);
+        if (0 > ctx->lseekdir(ctx, (SMBCFILE *)fi->fh, 0))
+        {
+            pthread_mutex_unlock(&ctx_mutex);
+            return -errno;
+        }
         while (NULL != (pdirent = ctx->readdir(ctx, (SMBCFILE *)fi->fh)))
         {
             if (pdirent->smbc_type == SMBC_DIR)
