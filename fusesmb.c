@@ -362,6 +362,7 @@ static int fusesmb_opendir(const char *path, struct fuse_file_info *fi)
         return 0;
     SMBCFILE *dir;
     char smb_path[MY_MAXPATHLEN] = "smb:/";
+    debug("%s", path);
     strcat(smb_path, stripworkgroup(path));
     pthread_mutex_lock(&ctx_mutex);
     dir = ctx->opendir(ctx, smb_path);
@@ -698,6 +699,7 @@ static int fusesmb_write(const char *path, const char *buf, size_t size, off_t o
 static int fusesmb_release(const char *path, struct fuse_file_info *fi)
 {
     (void)path;
+    debug("%s", path);
     pthread_mutex_lock(&rwd_ctx_mutex);
 #ifdef HAVE_LIBSMBCLIENT_CLOSE_FN
     rwd_ctx->close_fn(rwd_ctx, (SMBCFILE *)fi->fh);
@@ -723,7 +725,7 @@ static int fusesmb_mknod(const char *path, mode_t mode,
     //  return -EACCES;
     if (slashcount(path) <= 3)
         return -EACCES;
-
+    debug("%s", path);
     strcat(smb_path, stripworkgroup(path));
     pthread_mutex_lock(&ctx_mutex);
     if ((file = ctx->creat(ctx, smb_path, mode)) == NULL)
@@ -769,10 +771,9 @@ static int fusesmb_statfs(const char *path, struct statfs *fst)
 static int fusesmb_unlink(const char *file)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/";
-
+    debug("%s", file);
     if (slashcount(file) <= 3)
         return -EACCES;
-
     strcat(smb_path, stripworkgroup(file));
     pthread_mutex_lock(&ctx_mutex);
     if (ctx->unlink(ctx, smb_path) < 0)
@@ -787,7 +788,7 @@ static int fusesmb_unlink(const char *file)
 static int fusesmb_rmdir(const char *path)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/";
-
+    debug("%s", path);
     if (slashcount(path) <= 3)
         return -EACCES;
 
@@ -806,7 +807,7 @@ static int fusesmb_rmdir(const char *path)
 static int fusesmb_mkdir(const char *path, mode_t mode)
 {
     char smb_path[MY_MAXPATHLEN] = "smb:/";
-
+    debug("%s", path);
     if (slashcount(path) <= 3)
         return -EACCES;
 
@@ -866,6 +867,7 @@ static int fusesmb_utime(const char *path, struct utimbuf *buf)
 
 static int fusesmb_chmod(const char *path, mode_t mode)
 {
+    debug("%s", path);
     if (slashcount(path) <= 3)
         return -EPERM;
 
@@ -943,7 +945,7 @@ static int fusesmb_rename(const char *path, const char *new_path)
 {
     char smb_path[MY_MAXPATHLEN]     = "smb:/",
          new_smb_path[MY_MAXPATHLEN] = "smb:/";
-
+    debug("from: %s, to: %s", path, new_path);
     if (slashcount(path) <= 3 || slashcount(new_path) <= 3)
         return -EACCES;
 
