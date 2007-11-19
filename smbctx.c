@@ -29,6 +29,7 @@ pthread_mutex_t *fusesmb_auth_fn_cfg_mutex = NULL;
 static int nmblookup(const char *ip_server, char *output, size_t outputsize)
 {
     char ipcmd[1024] = "nmblookup -A ";
+    *output = '\0';
     strcat(ipcmd, ip_server);
     FILE *pipe = popen(ipcmd, "r");
     if (NULL == pipe)
@@ -174,7 +175,7 @@ static void fusesmb_cache_auth_fn(const char *server, const char *share,
 {
     (void)workgroup;
     (void)wgmaxlen;
-    char sv[1024];
+    char sv[1024] = '\0';
 
     /* Don't authenticate for workgroup listing */
     if (NULL == server || server[0] == '\0')
