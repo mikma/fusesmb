@@ -286,13 +286,14 @@ static void *workgroup_listing_thread(void *args)
 
     hash_t *ip_cache = hash_create(HASHCOUNT_T_MAX, NULL, NULL);
     if (NULL == ip_cache)
-        return NULL;
-
+    {
+        goto out;
+    }
     stringlist_t *servers = sl_init();
     if (NULL == servers)
     {
         fprintf(stderr, "Malloc failed\n");
-        return NULL;
+        goto out;
     }
     SMBCCTX *ctx = fusesmb_cache_new_context(&cfg);
     SMBCFILE *dir;
@@ -377,7 +378,9 @@ use_popen:
     hash_destroy(ip_cache);
     sl_free(servers);
     smbc_free_context(ctx, 1);
-    return 0;
+out:
+    free(wg);
+    return NULL;
 }
 
 
@@ -552,6 +555,7 @@ int main(int argc, char *argv[])
     cache_servers(ctx);
     smbc_free_context(ctx, 1);
     options_free(&opts);
+    config_free(&cfg);
     if (argc == 1)
     {
         unlink(pidfile);
