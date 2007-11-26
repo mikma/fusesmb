@@ -175,7 +175,7 @@ static void fusesmb_cache_auth_fn(const char *server, const char *share,
 {
     (void)workgroup;
     (void)wgmaxlen;
-    char sv[1024] = '\0';
+    char sv[1024];
 
     /* Don't authenticate for workgroup listing */
     if (NULL == server || server[0] == '\0')
